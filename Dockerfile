@@ -10,11 +10,11 @@ COPY src ./src
 RUN gradle bootJar --no-daemon -x test
 
 # ---- Run Stage ----
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
 # 보안: root 아닌 전용 유저로 실행
-RUN addgroup -S snapcal && adduser -S snapcal -G snapcal
+RUN groupadd --system snapcal && useradd --system --gid snapcal snapcal
 USER snapcal
 
 COPY --from=builder /app/build/libs/*.jar app.jar
