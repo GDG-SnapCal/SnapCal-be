@@ -35,3 +35,21 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### 환경변수 (절대 커밋 금지) ###
+.env
+.env.local
+.env.*.local
+# .env.example 은 추적 허용
+
+### 로그 ###
+*.log
+logs/
+
+### OS ###
+.DS_Store
+Thumbs.db
+
+### 임시/캐시 ###
+*.tmp
+*.swp
