@@ -37,7 +37,8 @@ openai:
 # Supabase Storage (S3 호환)
 supabase:
   storage:
-    endpoint: ${SUPABASE_STORAGE_ENDPOINT}   # https://<project>.supabase.co/storage/v1/s3
+    endpoint: ${SUPABASE_STORAGE_ENDPOINT}
+    public-url: ${SUPABASE_STORAGE_PUBLIC_URL:${SUPABASE_STORAGE_ENDPOINT}}
     access-key: ${SUPABASE_ACCESS_KEY}
     secret-key: ${SUPABASE_SECRET_KEY}
     bucket: snapcal-photos
