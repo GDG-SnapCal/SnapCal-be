@@ -1,2 +1,2 @@
 # SnapCal-be
-GDG-SnapCald 백엔드
+GDG-SnapCal 백엔드
