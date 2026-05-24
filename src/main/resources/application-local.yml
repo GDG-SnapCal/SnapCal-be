@@ -1,0 +1,21 @@
+# 로컬 Docker 환경 전용 설정 (application.yml을 오버라이드)
+# SPRING_PROFILE=local 일 때 자동 적용
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: none   # init.sql이 테이블 생성하므로 JPA 자동생성 비활성화
+    show-sql: true
+
+# 로컬에서는 MinIO 사용 (docker-compose의 minio 서비스)
+supabase:
+  storage:
+    endpoint: http://minio:9000
+    access-key: minioadmin
+    secret-key: minioadmin
+    bucket: snapcal-photos
+    region: us-east-1   # MinIO는 region 무관, 형식만 맞추면 됨
+
+logging:
+  level:
+    com.snapcal: DEBUG

@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: snapcal
+
+  datasource:
+    url: jdbc:postgresql://${SUPABASE_HOST}:5432/postgres
+    username: postgres
+    password: ${SUPABASE_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate        # 운영은 validate, 개발 초기엔 update 사용
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  servlet:
+    multipart:
+      max-file-size: 20MB       # 사진 1장 최대 크기
+      max-request-size: 200MB   # 다중 업로드 최대 크기 (최대 30장)
+
+# JWT 설정
+jwt:
+  secret: ${JWT_SECRET}         # 환경변수로 주입 (256bit 이상 권장)
+  expiration: 86400000          # 24시간 (ms)
+
+# OpenAI GPT-4o mini
+openai:
+  api-key: ${OPENAI_API_KEY}
+  model: gpt-4o-mini
+  max-tokens: 300
+  base-url: https://api.openai.com/v1
+
+# Supabase Storage (S3 호환)
+supabase:
+  storage:
+    endpoint: ${SUPABASE_STORAGE_ENDPOINT}   # https://<project>.supabase.co/storage/v1/s3
+    access-key: ${SUPABASE_ACCESS_KEY}
+    secret-key: ${SUPABASE_SECRET_KEY}
+    bucket: snapcal-photos
+    region: ap-northeast-2
+
+# 로깅
+logging:
+  level:
+    com.snapcal: DEBUG
+    org.hibernate.SQL: DEBUG
