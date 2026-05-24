@@ -1,5 +1,6 @@
 package com.snapcal.snapcalbackend.config;
 
+import okhttp3.OkHttpClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,6 +10,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 
 import java.net.URI;
+import java.util.concurrent.TimeUnit;
 
 @Configuration
 public class StorageConfig {
@@ -24,6 +26,14 @@ public class StorageConfig {
 
     @Value("${supabase.storage.region}")
     private String region;
+
+    @Bean
+    public OkHttpClient okHttpClient() {
+        return new OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .build();
+    }
 
     @Bean
     public S3Client s3Client() {
