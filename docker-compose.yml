@@ -16,6 +16,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       # 로컬에선 Supabase Storage 대신 MinIO 사용 (S3 호환)
       SUPABASE_STORAGE_ENDPOINT: http://minio:9000
+      SUPABASE_STORAGE_PUBLIC_URL: http://localhost:9000  # 브라우저/프론트에서 접근하는 URL
       SUPABASE_ACCESS_KEY: minioadmin
       SUPABASE_SECRET_KEY: minioadmin
     depends_on:
