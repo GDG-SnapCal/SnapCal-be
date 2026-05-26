@@ -57,7 +57,7 @@ INSERT INTO categories (name, color_hex, is_default) VALUES
     ('음식',   '#FAC775', true),
     ('패션',   '#F4C0D1', true),
     ('운동',   '#9FE1CB', true),
-    ('여행',   '#B5D4F4', true),
+    ('풍경',   '#B5D4F4', true),
     ('일상',   '#D3D1C7', true),
     ('미분류', '#E8E8E8', true)
 ON CONFLICT DO NOTHING;

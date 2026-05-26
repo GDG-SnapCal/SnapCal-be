@@ -17,10 +17,10 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ImageClassificationService {
 
-    private static final Set<String> VALID_CATEGORIES = Set.of("음식", "패션", "운동", "여행", "일상", "미분류");
+    private static final Set<String> VALID_CATEGORIES = Set.of("음식", "패션", "운동", "풍경", "일상", "미분류");
     private static final String FALLBACK_CATEGORY = "미분류";
     private static final String PROMPT =
-            "이 이미지를 다음 카테고리 중 하나로 분류하세요: 음식, 패션, 운동, 여행, 일상, 미분류\n" +
+            "이 이미지를 다음 카테고리 중 하나로 분류하세요: 음식, 패션, 운동, 풍경, 일상, 미분류\n" +
             "카테고리 이름만 반환하세요. 다른 텍스트는 포함하지 마세요.";
 
     private final OkHttpClient httpClient;
