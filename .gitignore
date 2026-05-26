@@ -53,3 +53,6 @@ Thumbs.db
 ### 임시/캐시 ###
 *.tmp
 *.swp
+
+### 테스트 이미지 ###
+test-images/
