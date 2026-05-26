@@ -11,6 +11,7 @@ public class CategoryResponse {
     private Integer categoryId;
     private String name;
     private String colorHex;
+    @com.fasterxml.jackson.annotation.JsonProperty("isDefault")
     private boolean isDefault;
 
     public static CategoryResponse from(Category category) {
