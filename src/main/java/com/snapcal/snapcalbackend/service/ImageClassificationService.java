@@ -74,8 +74,13 @@ public class ImageClassificationService {
             JsonNode root = objectMapper.readTree(responseBody);
             String content = root.path("choices").get(0)
                     .path("message").path("content").asText().trim();
+            log.debug("GPT 분류 응답: '{}'", content);
+            if (!VALID_CATEGORIES.contains(content)) {
+                log.warn("GPT가 알 수 없는 카테고리 반환: '{}' → 미분류 처리", content);
+            }
             return VALID_CATEGORIES.contains(content) ? content : FALLBACK_CATEGORY;
         } catch (Exception e) {
+            log.warn("GPT 응답 파싱 실패: {}", e.getMessage());
             return FALLBACK_CATEGORY;
         }
     }
