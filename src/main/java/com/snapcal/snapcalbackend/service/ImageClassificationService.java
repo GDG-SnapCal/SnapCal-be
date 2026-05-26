@@ -44,8 +44,8 @@ public class ImageClassificationService {
             String requestBody = objectMapper.writeValueAsString(new GPTRequest(
                     model,
                     List.of(new Message("user", List.of(
-                            new ImageContent(new ImageUrl(dataUrl)),
-                            new TextContent(PROMPT)
+                            ImageContent.of(new ImageUrl(dataUrl)),
+                            TextContent.of(PROMPT)
                     ))),
                     10
             ));
@@ -83,7 +83,11 @@ public class ImageClassificationService {
     // GPT 요청 레코드
     record GPTRequest(String model, List<Message> messages, int max_tokens) {}
     record Message(String role, List<Object> content) {}
-    record ImageContent(ImageUrl image_url) { String type() { return "image_url"; } }
-    record TextContent(String text) { String type() { return "text"; } }
+    record ImageContent(String type, ImageUrl image_url) {
+        static ImageContent of(ImageUrl url) { return new ImageContent("image_url", url); }
+    }
+    record TextContent(String type, String text) {
+        static TextContent of(String text) { return new TextContent("text", text); }
+    }
     record ImageUrl(String url) {}
 }
