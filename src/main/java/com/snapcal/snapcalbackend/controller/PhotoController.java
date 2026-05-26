@@ -65,6 +65,16 @@ public class PhotoController {
         return ApiResponse.ok(null);
     }
 
+    @DeleteMapping("/{photoId}")
+    public ApiResponse<Void> deletePhoto(
+            @PathVariable UUID photoId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        User user = resolveUser(userDetails);
+        photoUploadService.delete(photoId, user);
+        return ApiResponse.ok(null);
+    }
+
     @GetMapping("/{photoId}")
     public ApiResponse<PhotoDetailResponse> getPhoto(
             @PathVariable UUID photoId,

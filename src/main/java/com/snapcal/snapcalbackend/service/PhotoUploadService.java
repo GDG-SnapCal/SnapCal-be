@@ -71,6 +71,17 @@ public class PhotoUploadService {
     }
 
     @Transactional
+    public void delete(UUID photoId, User user) {
+        Photo photo = photoRepository.findById(photoId)
+                .filter(p -> p.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "사진을 찾을 수 없습니다."));
+
+        storageService.delete(photo.getOriginalUrl());
+        photoRepository.delete(photo);
+    }
+
+    @Transactional
     public void updateCategory(UUID photoId, Integer categoryId, User user) {
         Photo photo = photoRepository.findById(photoId)
                 .filter(p -> p.getUser().getId().equals(user.getId()))
