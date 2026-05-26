@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -31,6 +32,15 @@ public class GlobalExceptionHandler {
         String field = fieldError != null ? fieldError.getField() : null;
         String message = fieldError != null ? fieldError.getDefaultMessage() : "입력값이 올바르지 않습니다.";
         return ApiResponse.error("VALIDATION_ERROR", message, field);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public org.springframework.http.ResponseEntity<ApiResponse<Void>> handleResponseStatus(ResponseStatusException e) {
+        ApiResponse<Void> body = ApiResponse.error(
+                e.getStatusCode().toString().replace(" ", "_"),
+                e.getReason() != null ? e.getReason() : "요청을 처리할 수 없습니다."
+        );
+        return org.springframework.http.ResponseEntity.status(e.getStatusCode()).body(body);
     }
 
     @ExceptionHandler(Exception.class)
