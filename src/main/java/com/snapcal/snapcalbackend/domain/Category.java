@@ -37,4 +37,9 @@ public class Category {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
     }
+
+    public void update(String name, String colorHex) {
+        if (name != null) this.name = name;
+        if (colorHex != null) this.colorHex = colorHex;
+    }
 }

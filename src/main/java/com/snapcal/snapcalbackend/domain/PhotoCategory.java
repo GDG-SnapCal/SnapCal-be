@@ -49,4 +49,9 @@ public class PhotoCategory {
         this.classifiedBy = ClassifiedBy.USER;
         this.userCorrected = true;
     }
+
+    /** 카테고리 삭제 시 미분류로 이동 — 분류 주체/정정 여부는 그대로 유지 */
+    public void migrateToDefault(Category defaultCategory) {
+        this.category = defaultCategory;
+    }
 }
