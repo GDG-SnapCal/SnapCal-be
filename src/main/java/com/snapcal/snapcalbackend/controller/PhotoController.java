@@ -1,11 +1,11 @@
 package com.snapcal.snapcalbackend.controller;
 
-import com.snapcal.snapcalbackend.common.ApiResponse;
 import com.snapcal.snapcalbackend.domain.User;
 import com.snapcal.snapcalbackend.dto.request.CategoryUpdateRequest;
 import com.snapcal.snapcalbackend.dto.request.DuplicateSelectRequest;
 import com.snapcal.snapcalbackend.dto.response.PhotoDetailResponse;
 import com.snapcal.snapcalbackend.dto.response.PhotoUploadResponse;
+import com.snapcal.snapcalbackend.dto.response.UploadStatusResponse;
 import com.snapcal.snapcalbackend.repository.PhotoCategoryRepository;
 import com.snapcal.snapcalbackend.repository.PhotoRepository;
 import com.snapcal.snapcalbackend.repository.UserRepository;
@@ -35,48 +35,68 @@ public class PhotoController {
     private final UserRepository userRepository;
 
     @PostMapping("/upload")
-    public ApiResponse<PhotoUploadResponse> upload(
+    public PhotoUploadResponse upload(
             @RequestParam("photos") List<MultipartFile> photos,
             @AuthenticationPrincipal UserDetails userDetails) {
 
         User user = resolveUser(userDetails);
-        PhotoUploadResponse response = photoUploadService.upload(photos, user);
-        return ApiResponse.ok(response);
+        return photoUploadService.upload(photos, user);
+    }
+
+    @GetMapping("/upload/{uploadId}/status")
+    public UploadStatusResponse getUploadStatus(
+            @PathVariable String uploadId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        User user = resolveUser(userDetails);
+        return photoUploadService.getUploadStatus(uploadId, user);
     }
 
     @PostMapping("/duplicates/select")
-    public ApiResponse<Map<String, String>> selectDuplicates(
+    public Map<String, String> selectDuplicates(
             @Valid @RequestBody DuplicateSelectRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
 
         User user = resolveUser(userDetails);
         photoUploadService.selectFromDuplicates(request, user);
-        return ApiResponse.ok(Map.of("message", "선택이 완료되었습니다."));
+        return Map.of("message", "Selection completed.");
     }
 
     @PatchMapping("/{photoId}/category")
-    public ApiResponse<Void> updateCategory(
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateCategory(
             @PathVariable UUID photoId,
             @Valid @RequestBody CategoryUpdateRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
 
         User user = resolveUser(userDetails);
         photoUploadService.updateCategory(photoId, request.getCategoryId(), user);
-        return ApiResponse.ok(null);
     }
 
     @DeleteMapping("/{photoId}")
-    public ApiResponse<Void> deletePhoto(
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deletePhoto(
             @PathVariable UUID photoId,
             @AuthenticationPrincipal UserDetails userDetails) {
 
         User user = resolveUser(userDetails);
         photoUploadService.delete(photoId, user);
-        return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/{photoId}/edit")
+    public Map<String, String> editPhoto(
+            @PathVariable UUID photoId,
+            @RequestBody(required = false) Map<String, Object> options,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        User user = resolveUser(userDetails);
+        String url = photoUploadService.getEditablePhotoUrl(photoId, user);
+        return Map.of(
+                "photoId", photoId.toString(),
+                "editedUrl", url
+        );
     }
 
     @GetMapping("/{photoId}")
-    public ApiResponse<PhotoDetailResponse> getPhoto(
+    public PhotoDetailResponse getPhoto(
             @PathVariable UUID photoId,
             @AuthenticationPrincipal UserDetails userDetails) {
 
@@ -84,15 +104,15 @@ public class PhotoController {
 
         var photo = photoRepository.findById(photoId)
                 .filter(p -> p.getUser().getId().equals(user.getId()))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사진을 찾을 수 없습니다."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Photo not found."));
 
         var photoCategory = photoCategoryRepository.findByPhotoId(photoId).orElse(null);
 
-        return ApiResponse.ok(PhotoDetailResponse.of(photo, photoCategory));
+        return PhotoDetailResponse.of(photo, photoCategory);
     }
 
     private User resolveUser(UserDetails userDetails) {
         return userRepository.findByEmail(userDetails.getUsername())
-                .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new NoSuchElementException("User not found."));
     }
 }

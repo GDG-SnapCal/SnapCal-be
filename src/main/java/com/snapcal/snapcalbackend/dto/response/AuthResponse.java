@@ -12,6 +12,7 @@ import java.util.UUID;
 public class AuthResponse {
 
     private String accessToken;
+    private String refreshToken;
     private UserInfo user;
     private Boolean isNewUser;
 

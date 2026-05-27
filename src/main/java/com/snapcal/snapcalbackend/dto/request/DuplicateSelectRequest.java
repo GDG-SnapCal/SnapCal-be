@@ -1,6 +1,5 @@
 package com.snapcal.snapcalbackend.dto.request;
 
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 
@@ -27,7 +26,6 @@ public class DuplicateSelectRequest {
          * 삭제할 사진 ID 목록 (그룹 내 선택되지 않은 사진들).
          * 프론트에서 그룹의 photos 중 selectedPhotoId를 제외한 나머지를 담아 전송.
          */
-        @NotEmpty
         private List<String> unselectedPhotoIds;
     }
 }
