@@ -82,6 +82,7 @@ public class AuthService {
 
         AuthResponse response = AuthResponse.builder()
                 .accessToken(accessToken)
+                .refreshToken(refreshToken)
                 .user(AuthResponse.UserInfo.builder()
                         .userId(user.getId())
                         .name(user.getNickname())

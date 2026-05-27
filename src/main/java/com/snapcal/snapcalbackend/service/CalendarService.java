@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -60,6 +61,7 @@ public class CalendarService {
                     .year(year)
                     .month(month)
                     .days(List.of())
+                    .dates(Map.of())
                     .build();
         }
 
@@ -82,10 +84,24 @@ public class CalendarService {
                         .build())
                 .toList();
 
+        Map<String, CalendarResponse.DateEntry> dates = new LinkedHashMap<>();
+        for (CalendarResponse.DayEntry day : days) {
+            List<CalendarResponse.PhotoEntry> dayPhotos = day.getPhotos();
+            CalendarResponse.PhotoEntry representative = dayPhotos.get(0);
+            dates.put(day.getDate(), CalendarResponse.DateEntry.builder()
+                    .count(dayPhotos.size())
+                    .representativePhoto(CalendarResponse.RepresentativePhoto.builder()
+                            .photoId(representative.getPhotoId())
+                            .thumbnailUrl(representative.getThumbnailUrl())
+                            .build())
+                    .build());
+        }
+
         return CalendarResponse.builder()
                 .year(year)
                 .month(month)
                 .days(days)
+                .dates(dates)
                 .build();
     }
 

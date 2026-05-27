@@ -1,7 +1,7 @@
 package com.snapcal.snapcalbackend.controller;
 
-import com.snapcal.snapcalbackend.common.ApiResponse;
 import com.snapcal.snapcalbackend.dto.request.LoginRequest;
+import com.snapcal.snapcalbackend.dto.request.RefreshTokenRequest;
 import com.snapcal.snapcalbackend.dto.request.SignupRequest;
 import com.snapcal.snapcalbackend.dto.request.SocialLoginRequest;
 import com.snapcal.snapcalbackend.dto.response.AuthResponse;
@@ -28,35 +28,35 @@ public class AuthController {
 
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<AuthResponse> signup(@Valid @RequestBody SignupRequest request,
-                                            HttpServletResponse response) {
+    public AuthResponse signup(@Valid @RequestBody SignupRequest request,
+                               HttpServletResponse response) {
         AuthService.AuthResult result = authService.signup(request);
         setRefreshTokenCookie(response, result.refreshToken());
-        return ApiResponse.ok(result.response());
+        return result.response();
     }
 
     @PostMapping("/login")
-    public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginRequest request,
-                                           HttpServletResponse response) {
+    public AuthResponse login(@Valid @RequestBody LoginRequest request,
+                              HttpServletResponse response) {
         AuthService.AuthResult result = authService.login(request);
         setRefreshTokenCookie(response, result.refreshToken());
-        return ApiResponse.ok(result.response());
+        return result.response();
     }
 
     @PostMapping("/social")
-    public ApiResponse<AuthResponse> socialLogin(@Valid @RequestBody SocialLoginRequest request,
-                                                 HttpServletResponse response) {
+    public AuthResponse socialLogin(@Valid @RequestBody SocialLoginRequest request,
+                                    HttpServletResponse response) {
         AuthService.AuthResult result = authService.socialLogin(request);
         setRefreshTokenCookie(response, result.refreshToken());
-        return ApiResponse.ok(result.response());
+        return result.response();
     }
 
     @PostMapping("/refresh")
-    public ApiResponse<AuthResponse> refresh(HttpServletRequest request) {
-        String refreshToken = extractRefreshTokenFromCookie(request);
+    public AuthResponse refresh(HttpServletRequest request,
+                                @RequestBody(required = false) RefreshTokenRequest body) {
+        String refreshToken = extractRefreshToken(request, body);
         String newAccessToken = authService.refresh(refreshToken);
-        AuthResponse body = AuthResponse.builder().accessToken(newAccessToken).build();
-        return ApiResponse.ok(body);
+        return AuthResponse.builder().accessToken(newAccessToken).build();
     }
 
     private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
@@ -68,14 +68,19 @@ public class AuthController {
         response.addCookie(cookie);
     }
 
-    private String extractRefreshTokenFromCookie(HttpServletRequest request) {
-        if (request.getCookies() == null) {
-            throw new com.snapcal.snapcalbackend.exception.InvalidCredentialsException();
+    private String extractRefreshToken(HttpServletRequest request, RefreshTokenRequest body) {
+        if (body != null && body.getRefreshToken() != null && !body.getRefreshToken().isBlank()) {
+            return body.getRefreshToken();
         }
-        return Arrays.stream(request.getCookies())
-                .filter(c -> REFRESH_TOKEN_COOKIE.equals(c.getName()))
-                .map(Cookie::getValue)
-                .findFirst()
-                .orElseThrow(com.snapcal.snapcalbackend.exception.InvalidCredentialsException::new);
+
+        if (request.getCookies() != null) {
+            return Arrays.stream(request.getCookies())
+                    .filter(c -> REFRESH_TOKEN_COOKIE.equals(c.getName()))
+                    .map(Cookie::getValue)
+                    .findFirst()
+                    .orElseThrow(com.snapcal.snapcalbackend.exception.InvalidCredentialsException::new);
+        }
+
+        throw new com.snapcal.snapcalbackend.exception.InvalidCredentialsException();
     }
 }
