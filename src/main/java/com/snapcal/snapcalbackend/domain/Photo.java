@@ -41,8 +41,25 @@ public class Photo {
     @Column(name = "uploaded_at", nullable = false, updatable = false)
     private LocalDateTime uploadedAt;
 
+    /** 업로드 배치 단위 식별자 — 같은 업로드 요청에서 생성된 사진끼리 동일한 값을 가짐 */
+    @Column(name = "upload_id", nullable = false, length = 36)
+    private String uploadId;
+
+    /** PENDING: 중복 검토·캘린더 저장 대기 / CONFIRMED: 캘린더에 최종 저장 완료 */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 10)
+    @Builder.Default
+    private PhotoStatus status = PhotoStatus.PENDING;
+
     @PrePersist
     protected void onCreate() {
         uploadedAt = LocalDateTime.now();
+        if (status == null) {
+            status = PhotoStatus.PENDING;
+        }
+    }
+
+    public void confirm() {
+        this.status = PhotoStatus.CONFIRMED;
     }
 }

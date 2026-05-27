@@ -34,11 +34,15 @@ CREATE TABLE IF NOT EXISTS photos (
     taken_at      DATE,
     exif_available BOOLEAN NOT NULL DEFAULT false,
     phash         BIGINT,
-    uploaded_at   TIMESTAMP NOT NULL DEFAULT now()
+    uploaded_at   TIMESTAMP NOT NULL DEFAULT now(),
+    upload_id     VARCHAR(36) NOT NULL DEFAULT '',
+    status        VARCHAR(10) NOT NULL DEFAULT 'CONFIRMED' CHECK (status IN ('PENDING', 'CONFIRMED'))
 );
 
 -- 기존 설치 환경 대응 (컬럼이 없을 경우에만 추가)
 ALTER TABLE photos ADD COLUMN IF NOT EXISTS phash BIGINT;
+ALTER TABLE photos ADD COLUMN IF NOT EXISTS upload_id VARCHAR(36) NOT NULL DEFAULT '';
+ALTER TABLE photos ADD COLUMN IF NOT EXISTS status VARCHAR(10) NOT NULL DEFAULT 'CONFIRMED';
 
 CREATE TABLE IF NOT EXISTS photo_categories (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

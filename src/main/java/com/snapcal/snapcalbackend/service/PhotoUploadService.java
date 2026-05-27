@@ -34,6 +34,9 @@ public class PhotoUploadService {
     public PhotoUploadResponse upload(List<MultipartFile> files, User user) {
         List<UploadResult> results = new ArrayList<>();
 
+        // 같은 업로드 요청 묶음을 식별하는 배치 ID
+        String uploadId = UUID.randomUUID().toString();
+
         for (MultipartFile file : files) {
             try {
                 byte[] bytes = file.getBytes();
@@ -60,12 +63,15 @@ public class PhotoUploadService {
                     log.warn("이미지 분석 실패 (pHash/선명도): {}", file.getOriginalFilename(), e);
                 }
 
+                // PENDING 상태로 저장 — 캘린더 반영은 POST /api/calendar/save 호출 시 확정
                 Photo photo = photoRepository.save(Photo.builder()
                         .user(user)
                         .originalUrl(url)
                         .takenAt(takenAt.orElse(null))
                         .exifAvailable(takenAt.isPresent())
                         .phash(phash)
+                        .uploadId(uploadId)
+                        .status(com.snapcal.snapcalbackend.domain.PhotoStatus.PENDING)
                         .build());
 
                 photoCategoryRepository.save(PhotoCategory.builder()
@@ -82,7 +88,7 @@ public class PhotoUploadService {
             }
         }
 
-        return buildResponse(results);
+        return buildResponse(uploadId, results);
     }
 
     @Transactional
@@ -114,28 +120,23 @@ public class PhotoUploadService {
     @Transactional
     public void selectFromDuplicates(DuplicateSelectRequest request, User user) {
         for (DuplicateSelectRequest.Selection selection : request.getSelections()) {
-            UUID selectedId = UUID.fromString(selection.getSelectedPhotoId());
+            // 요청에서 명시적으로 받은 삭제 대상만 처리 (같은 날짜 전체 삭제 버그 제거)
+            for (String unselectedId : selection.getUnselectedPhotoIds()) {
+                UUID photoId = UUID.fromString(unselectedId);
 
-            photoRepository.findById(selectedId).ifPresent(selected -> {
-                if (selected.getTakenAt() == null) return;
-
-                List<Photo> sameDay = photoRepository.findByUserIdAndTakenAtBetween(
-                        user.getId(), selected.getTakenAt(), selected.getTakenAt());
-
-                sameDay.stream()
-                        .filter(p -> !p.getId().equals(selectedId))
-                        .forEach(p -> {
+                photoRepository.findById(photoId)
+                        .filter(p -> p.getUser().getId().equals(user.getId()))
+                        .ifPresent(p -> {
                             storageService.delete(p.getOriginalUrl());
                             photoRepository.delete(p);
                         });
-            });
+            }
         }
     }
 
     // ── private ──────────────────────────────────────────────────────
 
-    private PhotoUploadResponse buildResponse(List<UploadResult> results) {
-        String uploadId = UUID.randomUUID().toString();
+    private PhotoUploadResponse buildResponse(String uploadId, List<UploadResult> results) {
 
         // 날짜별 그룹핑 (EXIF 없는 사진 제외)
         Map<LocalDate, List<UploadResult>> byDate = results.stream()
