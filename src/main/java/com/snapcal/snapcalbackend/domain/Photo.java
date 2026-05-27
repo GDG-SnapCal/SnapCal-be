@@ -35,6 +35,9 @@ public class Photo {
     @Column(name = "exif_available", nullable = false)
     private boolean exifAvailable;
 
+    @Column(name = "phash")
+    private Long phash;
+
     @Column(name = "uploaded_at", nullable = false, updatable = false)
     private LocalDateTime uploadedAt;
 
