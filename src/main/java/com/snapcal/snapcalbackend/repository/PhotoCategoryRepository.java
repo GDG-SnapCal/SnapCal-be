@@ -10,4 +10,5 @@ import java.util.UUID;
 public interface PhotoCategoryRepository extends JpaRepository<PhotoCategory, UUID> {
     Optional<PhotoCategory> findByPhotoId(UUID photoId);
     List<PhotoCategory> findByPhotoIdIn(List<UUID> photoIds);
+    List<PhotoCategory> findAllByCategoryId(Integer categoryId);
 }
