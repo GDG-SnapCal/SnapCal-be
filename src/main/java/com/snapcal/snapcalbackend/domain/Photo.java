@@ -38,6 +38,9 @@ public class Photo {
     @Column(name = "phash")
     private Long phash;
 
+    @Column(name = "sharpness")
+    private Double sharpness;
+
     @Column(name = "uploaded_at", nullable = false, updatable = false)
     private LocalDateTime uploadedAt;
 
@@ -62,6 +65,13 @@ public class Photo {
         if (status == null) {
             status = PhotoStatus.PENDING;
         }
+    }
+
+    /** AI 분류·pHash·선명도 처리 완료 — PROCESSING → PENDING 전환 */
+    public void completeProcessing(Long phash, Double sharpness) {
+        this.phash = phash;
+        this.sharpness = sharpness;
+        this.status = PhotoStatus.PENDING;
     }
 
     public void confirm() {

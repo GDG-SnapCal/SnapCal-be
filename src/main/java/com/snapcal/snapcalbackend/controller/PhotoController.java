@@ -5,7 +5,8 @@ import com.snapcal.snapcalbackend.domain.User;
 import com.snapcal.snapcalbackend.dto.request.CategoryUpdateRequest;
 import com.snapcal.snapcalbackend.dto.request.DuplicateSelectRequest;
 import com.snapcal.snapcalbackend.dto.response.PhotoDetailResponse;
-import com.snapcal.snapcalbackend.dto.response.PhotoUploadResponse;
+import com.snapcal.snapcalbackend.dto.response.UploadInitiatedResponse;
+import com.snapcal.snapcalbackend.dto.response.UploadStatusResponse;
 import com.snapcal.snapcalbackend.repository.PhotoCategoryRepository;
 import com.snapcal.snapcalbackend.repository.PhotoRepository;
 import com.snapcal.snapcalbackend.repository.UserRepository;
@@ -13,6 +14,7 @@ import com.snapcal.snapcalbackend.service.PhotoUploadService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -35,13 +37,25 @@ public class PhotoController {
     private final UserRepository userRepository;
 
     @PostMapping("/upload")
-    public ApiResponse<PhotoUploadResponse> upload(
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ApiResponse<UploadInitiatedResponse> upload(
             @RequestParam("photos") List<MultipartFile> photos,
             @AuthenticationPrincipal UserDetails userDetails) {
 
         User user = resolveUser(userDetails);
-        PhotoUploadResponse response = photoUploadService.upload(photos, user);
-        return ApiResponse.ok(response);
+        return ApiResponse.ok(photoUploadService.upload(photos, user));
+    }
+
+    @GetMapping("/upload/{uploadId}/status")
+    public ResponseEntity<ApiResponse<UploadStatusResponse>> getUploadStatus(
+            @PathVariable String uploadId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        User user = resolveUser(userDetails);
+        UploadStatusResponse status = photoUploadService.getUploadStatus(uploadId, user);
+        HttpStatus httpStatus = "processing".equals(status.getStatus())
+                ? HttpStatus.ACCEPTED : HttpStatus.OK;
+        return ResponseEntity.status(httpStatus).body(ApiResponse.ok(status));
     }
 
     @PostMapping("/duplicates/select")

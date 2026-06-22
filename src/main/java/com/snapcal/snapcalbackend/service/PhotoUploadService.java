@@ -3,6 +3,8 @@ package com.snapcal.snapcalbackend.service;
 import com.snapcal.snapcalbackend.domain.*;
 import com.snapcal.snapcalbackend.dto.request.DuplicateSelectRequest;
 import com.snapcal.snapcalbackend.dto.response.PhotoUploadResponse;
+import com.snapcal.snapcalbackend.dto.response.UploadInitiatedResponse;
+import com.snapcal.snapcalbackend.dto.response.UploadStatusResponse;
 import com.snapcal.snapcalbackend.repository.CategoryRepository;
 import com.snapcal.snapcalbackend.repository.PhotoCategoryRepository;
 import com.snapcal.snapcalbackend.repository.PhotoRepository;
@@ -10,9 +12,11 @@ import com.snapcal.snapcalbackend.util.ExifExtractor;
 import com.snapcal.snapcalbackend.util.ImageAnalysisUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -25,98 +29,106 @@ public class PhotoUploadService {
 
     private final StorageService storageService;
     private final ExifExtractor exifExtractor;
-    private final ImageClassificationService classificationService;
+    private final PhotoProcessingService photoProcessingService;
     private final PhotoRepository photoRepository;
     private final CategoryRepository categoryRepository;
     private final PhotoCategoryRepository photoCategoryRepository;
 
-    @Transactional
-    public PhotoUploadResponse upload(List<MultipartFile> files, User user) {
-        List<UploadResult> results = new ArrayList<>();
-
-        // 같은 업로드 요청 묶음을 식별하는 배치 ID
+    /**
+     * 스토리지 업로드 + PROCESSING 상태 저장까지만 동기 처리 후 즉시 202 반환.
+     * AI 분류·pHash는 {@link PhotoProcessingService}가 백그라운드에서 처리.
+     */
+    public UploadInitiatedResponse upload(List<MultipartFile> files, User user) {
         String uploadId = UUID.randomUUID().toString();
+        Map<UUID, byte[]> photoIdToBytes = new LinkedHashMap<>();
+        Map<UUID, String> photoIdToContentType = new LinkedHashMap<>();
 
         for (MultipartFile file : files) {
             try {
                 byte[] bytes = file.getBytes();
 
-                // 스토리지 업로드
                 String url = storageService.upload(bytes, user.getId().toString(),
                         file.getOriginalFilename(), file.getContentType());
 
-                // EXIF 촬영일 추출
                 Optional<LocalDate> takenAt = exifExtractor.extract(bytes);
 
-                // GPT 카테고리 분류
-                ImageClassificationService.ClassificationResult classified =
-                        classificationService.classify(bytes, file.getContentType());
-                Category category = categoryRepository.findByNameAndIsDefaultTrue(classified.category())
-                        .orElseGet(() -> categoryRepository.findByNameAndIsDefaultTrue("미분류").orElseThrow());
-
-                // pHash + 선명도 계산 (실패해도 업로드는 계속)
-                Long phash = null;
-                double sharpness = 0.0;
-                try {
-                    phash = ImageAnalysisUtils.computePHash(bytes);
-                    sharpness = ImageAnalysisUtils.computeSharpness(bytes);
-                } catch (Exception e) {
-                    log.warn("이미지 분석 실패 (pHash/선명도): {}", file.getOriginalFilename(), e);
-                }
-
-                // PENDING 상태로 저장 — 캘린더 반영은 POST /api/calendar/save 호출 시 확정
+                // 각 save()는 Spring Data JPA의 @Transactional이 개별 커밋 보장
                 Photo photo = photoRepository.save(Photo.builder()
                         .user(user)
                         .originalUrl(url)
                         .takenAt(takenAt.orElse(null))
                         .exifAvailable(takenAt.isPresent())
-                        .phash(phash)
                         .uploadId(uploadId)
-                        .status(com.snapcal.snapcalbackend.domain.PhotoStatus.PENDING)
+                        .status(PhotoStatus.PROCESSING)
                         .build());
 
-                photoCategoryRepository.save(PhotoCategory.builder()
-                        .photo(photo)
-                        .category(category)
-                        .classifiedBy(ClassifiedBy.AI)
-                        .aiConfidence(classified.confidence())
-                        .userCorrected(false)
-                        .build());
-
-                results.add(new UploadResult(photo, category, phash, sharpness));
+                photoIdToBytes.put(photo.getId(), bytes);
+                photoIdToContentType.put(photo.getId(), file.getContentType());
 
             } catch (Exception e) {
-                log.warn("사진 처리 실패: {}", file.getOriginalFilename(), e);
+                log.warn("사진 업로드 실패: {}", file.getOriginalFilename(), e);
             }
         }
 
-        return buildResponse(uploadId, results);
+        // 저장된 Photo들이 커밋된 후 비동기 처리 시작
+        if (!photoIdToBytes.isEmpty()) {
+            photoProcessingService.processAsync(photoIdToBytes, photoIdToContentType);
+        }
+
+        return UploadInitiatedResponse.builder()
+                .uploadId(uploadId)
+                .total(photoIdToBytes.size())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public UploadStatusResponse getUploadStatus(String uploadId, User user) {
+        List<Photo> photos = photoRepository.findByUploadId(uploadId);
+
+        if (photos.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "업로드 배치를 찾을 수 없습니다.");
+        }
+
+        boolean ownerMismatch = photos.stream()
+                .anyMatch(p -> !p.getUser().getId().equals(user.getId()));
+        if (ownerMismatch) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
+        }
+
+        int total = photos.size();
+        int completed = (int) photos.stream()
+                .filter(p -> p.getStatus() != PhotoStatus.PROCESSING)
+                .count();
+
+        if (completed < total) {
+            return UploadStatusResponse.builder()
+                    .uploadId(uploadId)
+                    .status("processing")
+                    .total(total)
+                    .completed(completed)
+                    .build();
+        }
+
+        PhotoUploadResponse result = buildResponseFromDb(uploadId, photos);
+        return UploadStatusResponse.builder()
+                .uploadId(uploadId)
+                .status("done")
+                .total(total)
+                .completed(total)
+                .duplicateGroups(result.getDuplicateGroups())
+                .classifications(result.getClassifications())
+                .build();
     }
 
     @Transactional
     public void delete(UUID photoId, User user) {
         Photo photo = photoRepository.findById(photoId)
                 .filter(p -> p.getUser().getId().equals(user.getId()))
-                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
-                        org.springframework.http.HttpStatus.NOT_FOUND, "사진을 찾을 수 없습니다."));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "사진을 찾을 수 없습니다."));
 
         storageService.delete(photo.getOriginalUrl());
         photoRepository.delete(photo);
-    }
-
-    @Transactional
-    public void setRepresentative(UUID photoId, User user) {
-        Photo photo = photoRepository.findById(photoId)
-                .filter(p -> p.getUser().getId().equals(user.getId()))
-                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
-                        org.springframework.http.HttpStatus.NOT_FOUND, "사진을 찾을 수 없습니다."));
-
-        if (photo.getTakenAt() != null) {
-            photoRepository.findByUserIdAndTakenAtAndIsRepresentativeTrue(user.getId(), photo.getTakenAt())
-                    .ifPresent(Photo::unsetRepresentative);
-        }
-
-        photo.setAsRepresentative();
     }
 
     @Transactional
@@ -135,9 +147,23 @@ public class PhotoUploadService {
     }
 
     @Transactional
+    public void setRepresentative(UUID photoId, User user) {
+        Photo photo = photoRepository.findById(photoId)
+                .filter(p -> p.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "사진을 찾을 수 없습니다."));
+
+        if (photo.getTakenAt() != null) {
+            photoRepository.findByUserIdAndTakenAtAndIsRepresentativeTrue(user.getId(), photo.getTakenAt())
+                    .ifPresent(Photo::unsetRepresentative);
+        }
+
+        photo.setAsRepresentative();
+    }
+
+    @Transactional
     public void selectFromDuplicates(DuplicateSelectRequest request, User user) {
         for (DuplicateSelectRequest.Selection selection : request.getSelections()) {
-            // 요청에서 명시적으로 받은 삭제 대상만 처리 (같은 날짜 전체 삭제 버그 제거)
             for (String unselectedId : selection.getUnselectedPhotoIds()) {
                 UUID photoId = UUID.fromString(unselectedId);
 
@@ -153,53 +179,57 @@ public class PhotoUploadService {
 
     // ── private ──────────────────────────────────────────────────────
 
-    private PhotoUploadResponse buildResponse(String uploadId, List<UploadResult> results) {
+    private PhotoUploadResponse buildResponseFromDb(String uploadId, List<Photo> photos) {
+        List<UUID> photoIds = photos.stream().map(Photo::getId).toList();
+        Map<UUID, PhotoCategory> categoryByPhotoId = photoCategoryRepository
+                .findByPhotoIdIn(photoIds)
+                .stream()
+                .collect(Collectors.toMap(pc -> pc.getPhoto().getId(), pc -> pc));
 
-        // 날짜별 그룹핑 (EXIF 없는 사진 제외)
-        Map<LocalDate, List<UploadResult>> byDate = results.stream()
-                .filter(r -> r.photo().getTakenAt() != null)
-                .collect(Collectors.groupingBy(r -> r.photo().getTakenAt()));
+        List<PhotoUploadResponse.Classification> classifications = photos.stream()
+                .map(photo -> {
+                    PhotoCategory pc = categoryByPhotoId.get(photo.getId());
+                    String categoryName = (pc != null && pc.getCategory() != null)
+                            ? pc.getCategory().getName() : "미분류";
+                    return PhotoUploadResponse.Classification.builder()
+                            .photoId(photo.getId().toString())
+                            .url(photo.getOriginalUrl())
+                            .takenAt(photo.getTakenAt() != null ? photo.getTakenAt().toString() : null)
+                            .category(categoryName)
+                            .build();
+                }).toList();
+
+        Map<LocalDate, List<Photo>> byDate = photos.stream()
+                .filter(p -> p.getTakenAt() != null)
+                .collect(Collectors.groupingBy(Photo::getTakenAt));
 
         List<PhotoUploadResponse.DuplicateGroup> duplicateGroups = new ArrayList<>();
-
-        for (Map.Entry<LocalDate, List<UploadResult>> entry : byDate.entrySet()) {
-            List<UploadResult> dayPhotos = entry.getValue();
+        for (Map.Entry<LocalDate, List<Photo>> entry : byDate.entrySet()) {
+            List<Photo> dayPhotos = entry.getValue();
             if (dayPhotos.size() < 2) continue;
 
-            // pHash 기반 유사도 클러스터링
-            List<List<UploadResult>> clusters = clusterByPHash(dayPhotos);
-
-            for (List<UploadResult> cluster : clusters) {
+            List<List<Photo>> clusters = clusterPhotosByPHash(dayPhotos);
+            for (List<Photo> cluster : clusters) {
                 if (cluster.size() < 2) continue;
 
-                // 가장 선명한 사진을 AI 추천 대표 사진으로 선택
-                UploadResult sharpest = cluster.stream()
-                        .max(Comparator.comparingDouble(UploadResult::sharpness))
+                Photo sharpest = cluster.stream()
+                        .max(Comparator.comparingDouble(p -> p.getSharpness() != null ? p.getSharpness() : 0.0))
                         .orElse(cluster.get(0));
 
                 duplicateGroups.add(PhotoUploadResponse.DuplicateGroup.builder()
                         .groupId(UUID.randomUUID().toString())
                         .takenAt(entry.getKey().toString())
                         .photos(cluster.stream()
-                                .map(r -> PhotoUploadResponse.PhotoInfo.builder()
-                                        .photoId(r.photo().getId().toString())
-                                        .url(r.photo().getOriginalUrl())
-                                        .takenAt(r.photo().getTakenAt().toString())
+                                .map(p -> PhotoUploadResponse.PhotoInfo.builder()
+                                        .photoId(p.getId().toString())
+                                        .url(p.getOriginalUrl())
+                                        .takenAt(p.getTakenAt().toString())
                                         .build())
                                 .toList())
-                        .aiRecommendedPhotoId(sharpest.photo().getId().toString())
+                        .aiRecommendedPhotoId(sharpest.getId().toString())
                         .build());
             }
         }
-
-        List<PhotoUploadResponse.Classification> classifications = results.stream()
-                .map(r -> PhotoUploadResponse.Classification.builder()
-                        .photoId(r.photo().getId().toString())
-                        .url(r.photo().getOriginalUrl())
-                        .takenAt(r.photo().getTakenAt() != null ? r.photo().getTakenAt().toString() : null)
-                        .category(r.category().getName())
-                        .build())
-                .toList();
 
         return PhotoUploadResponse.builder()
                 .uploadId(uploadId)
@@ -209,43 +239,31 @@ public class PhotoUploadService {
                 .build();
     }
 
-    /**
-     * 같은 날 사진들을 pHash 유사도 기준으로 클러스터링
-     * 한 클러스터 안에 있는 사진끼리는 서로 시각적으로 유사 (버스트샷 등)
-     */
-    private List<List<UploadResult>> clusterByPHash(List<UploadResult> photos) {
-        List<List<UploadResult>> clusters = new ArrayList<>();
+    private List<List<Photo>> clusterPhotosByPHash(List<Photo> photos) {
+        List<List<Photo>> clusters = new ArrayList<>();
         boolean[] assigned = new boolean[photos.size()];
 
         for (int i = 0; i < photos.size(); i++) {
             if (assigned[i]) continue;
-
-            List<UploadResult> cluster = new ArrayList<>();
+            List<Photo> cluster = new ArrayList<>();
             cluster.add(photos.get(i));
             assigned[i] = true;
 
             for (int j = i + 1; j < photos.size(); j++) {
                 if (assigned[j]) continue;
-
-                // pHash가 null이면 중복으로 판단하지 않음
-                Long phashJ = photos.get(j).phash();
+                Long phashJ = photos.get(j).getPhash();
                 if (phashJ == null) continue;
 
-                boolean similarToCluster = cluster.stream()
-                        .filter(m -> m.phash() != null)
-                        .anyMatch(m -> ImageAnalysisUtils.isDuplicate(m.phash(), phashJ));
-
-                if (similarToCluster) {
+                boolean similar = cluster.stream()
+                        .filter(m -> m.getPhash() != null)
+                        .anyMatch(m -> ImageAnalysisUtils.isDuplicate(m.getPhash(), phashJ));
+                if (similar) {
                     cluster.add(photos.get(j));
                     assigned[j] = true;
                 }
             }
-
             clusters.add(cluster);
         }
-
         return clusters;
     }
-
-    private record UploadResult(Photo photo, Category category, Long phash, double sharpness) {}
 }

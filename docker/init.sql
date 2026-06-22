@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS photos (
     phash         BIGINT,
     uploaded_at   TIMESTAMP NOT NULL DEFAULT now(),
     upload_id     VARCHAR(36) NOT NULL DEFAULT '',
-    status        VARCHAR(10) NOT NULL DEFAULT 'CONFIRMED' CHECK (status IN ('PENDING', 'CONFIRMED'))
+    status        VARCHAR(10) NOT NULL DEFAULT 'CONFIRMED' CHECK (status IN ('PROCESSING', 'PENDING', 'CONFIRMED'))
 );
 
 -- 기존 설치 환경 대응 (컬럼이 없을 경우에만 추가)
@@ -44,6 +44,11 @@ ALTER TABLE photos ADD COLUMN IF NOT EXISTS phash BIGINT;
 ALTER TABLE photos ADD COLUMN IF NOT EXISTS upload_id VARCHAR(36) NOT NULL DEFAULT '';
 ALTER TABLE photos ADD COLUMN IF NOT EXISTS status VARCHAR(10) NOT NULL DEFAULT 'CONFIRMED';
 ALTER TABLE photos ADD COLUMN IF NOT EXISTS is_representative BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE photos ADD COLUMN IF NOT EXISTS sharpness FLOAT;
+-- status CHECK 제약에 PROCESSING 추가 (기존 설치 환경 대응)
+ALTER TABLE photos DROP CONSTRAINT IF EXISTS photos_status_check;
+ALTER TABLE photos ADD CONSTRAINT photos_status_check
+    CHECK (status IN ('PROCESSING', 'PENDING', 'CONFIRMED'));
 
 CREATE TABLE IF NOT EXISTS photo_categories (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

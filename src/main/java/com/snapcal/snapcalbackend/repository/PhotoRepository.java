@@ -18,6 +18,9 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
     /** 업로드 배치 전체 조회 — 캘린더 저장 시 사용 */
     List<Photo> findByUploadIdAndStatus(String uploadId, PhotoStatus status);
 
+    /** 업로드 배치 전체 조회 — uploadId로 모든 상태 조회 (PROCESSING 포함) */
+    List<Photo> findByUploadId(String uploadId);
+
     /** 특정 날짜의 현재 대표 사진 조회 — 대표 사진 교체 시 기존 해제용 */
     Optional<Photo> findByUserIdAndTakenAtAndIsRepresentativeTrue(UUID userId, LocalDate takenAt);
 
