@@ -49,8 +49,9 @@ public class PhotoUploadService {
                 Optional<LocalDate> takenAt = exifExtractor.extract(bytes);
 
                 // GPT 카테고리 분류
-                String categoryName = classificationService.classify(bytes, file.getContentType());
-                Category category = categoryRepository.findByNameAndIsDefaultTrue(categoryName)
+                ImageClassificationService.ClassificationResult classified =
+                        classificationService.classify(bytes, file.getContentType());
+                Category category = categoryRepository.findByNameAndIsDefaultTrue(classified.category())
                         .orElseGet(() -> categoryRepository.findByNameAndIsDefaultTrue("미분류").orElseThrow());
 
                 // pHash + 선명도 계산 (실패해도 업로드는 계속)
@@ -78,6 +79,7 @@ public class PhotoUploadService {
                         .photo(photo)
                         .category(category)
                         .classifiedBy(ClassifiedBy.AI)
+                        .aiConfidence(classified.confidence())
                         .userCorrected(false)
                         .build());
 
@@ -100,6 +102,21 @@ public class PhotoUploadService {
 
         storageService.delete(photo.getOriginalUrl());
         photoRepository.delete(photo);
+    }
+
+    @Transactional
+    public void setRepresentative(UUID photoId, User user) {
+        Photo photo = photoRepository.findById(photoId)
+                .filter(p -> p.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "사진을 찾을 수 없습니다."));
+
+        if (photo.getTakenAt() != null) {
+            photoRepository.findByUserIdAndTakenAtAndIsRepresentativeTrue(user.getId(), photo.getTakenAt())
+                    .ifPresent(Photo::unsetRepresentative);
+        }
+
+        photo.setAsRepresentative();
     }
 
     @Transactional

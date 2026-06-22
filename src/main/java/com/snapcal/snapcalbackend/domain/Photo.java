@@ -51,6 +51,11 @@ public class Photo {
     @Builder.Default
     private PhotoStatus status = PhotoStatus.PENDING;
 
+    /** 날짜별 대표 사진 여부 — 캘린더 썸네일에 우선 표시 */
+    @Column(name = "is_representative", nullable = false)
+    @Builder.Default
+    private boolean isRepresentative = false;
+
     @PrePersist
     protected void onCreate() {
         uploadedAt = LocalDateTime.now();
@@ -61,5 +66,13 @@ public class Photo {
 
     public void confirm() {
         this.status = PhotoStatus.CONFIRMED;
+    }
+
+    public void setAsRepresentative() {
+        this.isRepresentative = true;
+    }
+
+    public void unsetRepresentative() {
+        this.isRepresentative = false;
     }
 }

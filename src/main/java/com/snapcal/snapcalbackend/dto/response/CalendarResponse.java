@@ -27,5 +27,6 @@ public class CalendarResponse {
         private String thumbnailUrl;
         private String category;
         private String categoryColor;
+        private boolean isRepresentative;
     }
 }

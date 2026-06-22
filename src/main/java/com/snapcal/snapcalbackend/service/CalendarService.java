@@ -104,6 +104,7 @@ public class CalendarService {
                 .thumbnailUrl(url)
                 .category(categoryName)
                 .categoryColor(categoryColor)
+                .isRepresentative(photo.isRepresentative())
                 .build();
     }
 }

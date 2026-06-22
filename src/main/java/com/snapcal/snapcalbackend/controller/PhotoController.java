@@ -65,6 +65,16 @@ public class PhotoController {
         return ApiResponse.ok(null);
     }
 
+    @PatchMapping("/{photoId}/representative")
+    public ApiResponse<Void> setRepresentative(
+            @PathVariable UUID photoId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        User user = resolveUser(userDetails);
+        photoUploadService.setRepresentative(photoId, user);
+        return ApiResponse.ok(null);
+    }
+
     @DeleteMapping("/{photoId}")
     public ApiResponse<Void> deletePhoto(
             @PathVariable UUID photoId,
