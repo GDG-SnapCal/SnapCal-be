@@ -8,17 +8,8 @@ services:
     container_name: snapcal-app
     ports:
       - "8080:8080"
-    environment:
-      SPRING_PROFILE: local
-      SUPABASE_HOST: db          # compose 내부 서비스명으로 연결
-      SUPABASE_DB_PASSWORD: ${SUPABASE_DB_PASSWORD}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      JWT_SECRET: ${JWT_SECRET}
-      # 로컬에선 Supabase Storage 대신 MinIO 사용 (S3 호환)
-      SUPABASE_STORAGE_ENDPOINT: http://minio:9000
-      SUPABASE_STORAGE_PUBLIC_URL: http://localhost:9000  # 브라우저/프론트에서 접근하는 URL
-      SUPABASE_ACCESS_KEY: minioadmin
-      SUPABASE_SECRET_KEY: minioadmin
+    env_file:
+      - .env
     depends_on:
       db:
         condition: service_healthy
@@ -27,6 +18,22 @@ services:
     restart: unless-stopped
     networks:
       - snapcal-net
+
+  # ── Spring Boot 앱 (Supabase 연결 — 로컬 DB/MinIO 불필요) ───
+  app-supabase:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: snapcal-app
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - snapcal-net
+    profiles:
+      - supabase
 
   # ── PostgreSQL (Supabase DB 역할) ────────────────────────────
   db:
