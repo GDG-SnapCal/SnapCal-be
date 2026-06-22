@@ -35,9 +35,12 @@
 | HTTP | code | 설명 |
 |------|------|------|
 | 400 | `VALIDATION_ERROR` | 요청 필드 검증 실패 |
-| 401 | `UNAUTHORIZED` | 인증 실패 또는 토큰 없음 |
+| 400 | `BAD_REQUEST` | 잘못된 요청 (지원하지 않는 값 등) |
+| 401 | `UNAUTHORIZED` | 인증 실패 또는 토큰 없음·만료 |
+| 403 | `FORBIDDEN` | 권한 없음 (타인 리소스 접근 등) |
 | 404 | `NOT_FOUND` | 리소스를 찾을 수 없음 |
 | 409 | `CONFLICT` | 중복 데이터 (이메일 등) |
+| 501 | `NOT_IMPLEMENTED` | 미구현 기능 호출 |
 | 500 | `SERVER_ERROR` | 서버 내부 오류 |
 
 ---
@@ -46,8 +49,12 @@
 
 | 구분 | 값 |
 |------|----|
-| Access Token 유효기간 | 24시간 |
+| Access Token 유효기간 | **1시간** |
 | Access Token 전달 방식 | `Authorization: Bearer {token}` 헤더 |
+| Refresh Token 유효기간 | 7일 |
+| Refresh Token 전달 방식 | `HttpOnly Secure 쿠키` (`refreshToken`) |
+
+> Refresh Token은 `POST /api/auth/refresh` 호출 시 쿠키로 자동 갱신됩니다 (Sliding Window).
 
 ---
 
@@ -75,7 +82,7 @@ POST /api/auth/signup
 }
 ```
 
-**Response** `200 OK`
+**Response** `201 Created`
 
 ```json
 {
@@ -91,6 +98,8 @@ POST /api/auth/signup
   }
 }
 ```
+
+> Refresh Token은 `Set-Cookie` 헤더로 자동 설정됩니다.
 
 **에러**
 
@@ -138,6 +147,8 @@ POST /api/auth/login
 }
 ```
 
+> Refresh Token은 `Set-Cookie` 헤더로 자동 설정됩니다.
+
 **에러**
 
 | HTTP | code | 조건 |
@@ -152,7 +163,7 @@ POST /api/auth/login
 POST /api/auth/social
 ```
 
-> ⚠️ **미구현** — Kakao/Google API 연동 로직 구현 필요
+> ⚠️ **미구현** — 호출 시 `501 NOT_IMPLEMENTED` 반환. Kakao/Google API 연동 로직 추후 구현 예정.
 
 **Request Body**
 
@@ -161,52 +172,24 @@ POST /api/auth/social
 | provider | string | ✅ | `kakao` 또는 `google` |
 | accessToken | string | ✅ | 소셜 플랫폼에서 발급받은 Access Token |
 
----
+**에러**
 
-## 2. 사진 (Photos)
-
-> 모든 엔드포인트에 `Authorization: Bearer {accessToken}` 헤더가 필요합니다.
-
-### 📌 업로드 3단계 플로우
-
-사진을 캘린더에 저장하려면 아래 순서로 API를 호출해야 합니다.
-
-```
-① POST /api/photos/upload
-      → 사진 업로드, PENDING 상태로 저장, uploadId 발급
-      → duplicateGroups가 있으면 ②로, 없으면 ③으로
-
-② POST /api/photos/duplicates/select  (중복 그룹이 있을 때만)
-      → 각 그룹에서 남길 사진 선택, 나머지 삭제
-
-③ POST /api/calendar/save
-      → uploadId 전달 → PENDING → CONFIRMED 전환, 캘린더에 반영
-```
-
-> ⚠️ **③을 호출하지 않으면 사진이 캘린더에 표시되지 않습니다.**
+| HTTP | code | 조건 |
+|------|------|------|
+| 501 | `NOT_IMPLEMENTED` | 소셜 로그인 미구현 |
 
 ---
 
-### 2-1. 사진 업로드 및 AI 분류
+### 1-4. Access Token 갱신
 
 ```
-POST /api/photos/upload
-Content-Type: multipart/form-data
+POST /api/auth/refresh
 ```
 
-여러 장의 사진을 한 번에 업로드합니다.
+쿠키의 Refresh Token으로 새 Access Token과 Refresh Token을 발급합니다.  
+**Refresh Token도 함께 갱신**되므로 앱을 계속 사용하면 자동으로 로그인이 유지됩니다.
 
-1. Supabase Storage (로컬: MinIO)에 저장
-2. EXIF에서 촬영 날짜 추출
-3. GPT-4o mini로 카테고리 자동 분류
-4. pHash로 유사 사진 감지 → 같은 날 2장 이상이면 중복 그룹 반환
-5. **PENDING 상태로 저장** — `POST /api/calendar/save` 호출 전까지 캘린더에 미반영
-
-**Form Data**
-
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| photos | file[] | ✅ | 사진 파일 목록 (장당 최대 20MB, 최대 30장) |
+**Request**: 쿠키에 `refreshToken`이 자동으로 포함되면 됩니다. 별도 Body 없음.
 
 **Response** `200 OK`
 
@@ -214,23 +197,134 @@ Content-Type: multipart/form-data
 {
   "success": true,
   "data": {
+    "accessToken": "eyJhbGci...",
+    "user": {
+      "userId": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "홍길동",
+      "email": "hong@example.com",
+      "profileImageUrl": null
+    }
+  }
+}
+```
+
+> 갱신된 Refresh Token은 `Set-Cookie` 헤더로 자동 교체됩니다.
+
+**에러**
+
+| HTTP | code | 조건 |
+|------|------|------|
+| 401 | `UNAUTHORIZED` | Refresh Token 없음 또는 만료 |
+
+---
+
+## 2. 사진 (Photos)
+
+> 모든 엔드포인트에 `Authorization: Bearer {accessToken}` 헤더가 필요합니다.
+
+### 📌 업로드 4단계 플로우
+
+사진을 캘린더에 저장하려면 아래 순서로 API를 호출해야 합니다.
+
+```
+① POST /api/photos/upload
+      → 스토리지 저장, uploadId 발급, 즉시 202 반환
+      → 백그라운드에서 AI 분류·pHash 처리 시작
+
+② GET /api/photos/upload/{uploadId}/status  (1~2초 간격 폴링)
+      → status: "processing" → 계속 폴링
+      → status: "done" → classifications, duplicateGroups 수신
+
+③ POST /api/photos/duplicates/select  (duplicateGroups가 있을 때만)
+      → 각 그룹에서 남길 사진 선택, 나머지 삭제
+
+④ POST /api/calendar/save
+      → uploadId 전달 → PENDING → CONFIRMED 전환, 캘린더에 반영
+```
+
+> ⚠️ **④를 호출하지 않으면 사진이 캘린더에 표시되지 않습니다.**
+
+---
+
+### 2-1. 사진 업로드
+
+```
+POST /api/photos/upload
+Content-Type: multipart/form-data
+```
+
+여러 장의 사진을 스토리지에 저장하고 AI 분류를 백그라운드에서 시작합니다.
+
+**Form Data**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| photos | file[] | ✅ | 사진 파일 목록 (장당 최대 20MB) |
+
+**Response** `202 Accepted`
+
+```json
+{
+  "success": true,
+  "data": {
+    "uploadId": "a1b2c3d4-...",
+    "total": 5
+  }
+}
+```
+
+| 필드 | 설명 |
+|------|------|
+| `uploadId` | 이후 상태 폴링, 중복 선택, 캘린더 저장 시 사용 |
+| `total` | 업로드된 사진 총 수 |
+
+---
+
+### 2-2. 업로드 상태 폴링
+
+```
+GET /api/photos/upload/{uploadId}/status
+```
+
+백그라운드 AI 분류 진행 상황을 확인합니다. `status: "done"` 이 될 때까지 1~2초 간격으로 폴링합니다.
+
+**Path Parameter**
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| uploadId | string | 업로드 시 발급된 배치 식별자 |
+
+**Response — 처리 중** `202 Accepted`
+
+```json
+{
+  "success": true,
+  "data": {
+    "uploadId": "a1b2c3d4-...",
+    "status": "processing",
+    "total": 5,
+    "completed": 2
+  }
+}
+```
+
+**Response — 완료** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
     "uploadId": "a1b2c3d4-...",
     "status": "done",
+    "total": 5,
+    "completed": 5,
     "duplicateGroups": [
       {
         "groupId": "e5f6g7h8-...",
         "takenAt": "2024-03-15",
         "photos": [
-          {
-            "photoId": "uuid-1",
-            "url": "https://storage.../photo1.jpg",
-            "takenAt": "2024-03-15"
-          },
-          {
-            "photoId": "uuid-2",
-            "url": "https://storage.../photo2.jpg",
-            "takenAt": "2024-03-15"
-          }
+          { "photoId": "uuid-1", "url": "https://storage.../photo1.jpg", "takenAt": "2024-03-15" },
+          { "photoId": "uuid-2", "url": "https://storage.../photo2.jpg", "takenAt": "2024-03-15" }
         ],
         "aiRecommendedPhotoId": "uuid-1"
       }
@@ -249,8 +343,8 @@ Content-Type: multipart/form-data
 
 | 필드 | 설명 |
 |------|------|
-| `uploadId` | 이후 중복 선택 및 캘린더 저장 시 사용 |
-| `status` | `done` \| `processing` \| `error` |
+| `status` | `"processing"` \| `"done"` |
+| `completed` | AI 분류까지 완료된 사진 수 |
 | `duplicateGroups` | 같은 날 유사 사진이 2장 이상일 때만 포함, 없으면 `null` |
 | `aiRecommendedPhotoId` | pHash 기반 가장 선명한 사진 ID |
 | `classifications` | 전체 업로드 사진의 AI 분류 결과 |
@@ -266,9 +360,16 @@ Content-Type: multipart/form-data
 | 일상 | `#D3D1C7` |
 | 미분류 | `#E8E8E8` |
 
+**에러**
+
+| HTTP | 조건 |
+|------|------|
+| 404 | 존재하지 않는 uploadId |
+| 403 | 본인 업로드 배치가 아님 |
+
 ---
 
-### 2-2. 중복 사진 선택
+### 2-3. 중복 사진 선택
 
 ```
 POST /api/photos/duplicates/select
@@ -285,7 +386,7 @@ POST /api/photos/duplicates/select
 | selections | array | ✅ | 그룹별 선택 목록 |
 | selections[].groupId | string | ✅ | 중복 그룹 ID |
 | selections[].selectedPhotoId | string | ✅ | 남길 사진의 photoId |
-| selections[].unselectedPhotoIds | string[] | ✅ | 삭제할 사진 ID 목록 (그룹 내 나머지 사진) |
+| selections[].unselectedPhotoIds | string[] | ✅ | 삭제할 사진 ID 목록 |
 
 ```json
 {
@@ -305,21 +406,20 @@ POST /api/photos/duplicates/select
 ```json
 {
   "success": true,
-  "data": {
-    "message": "선택이 완료되었습니다."
-  }
+  "data": { "message": "선택이 완료되었습니다." }
 }
 ```
 
 ---
 
-### 2-3. 카테고리 수동 변경
+### 2-4. 카테고리 수동 변경
 
 ```
 PATCH /api/photos/{photoId}/category
 ```
 
-AI가 분류한 카테고리를 사용자가 직접 변경합니다.
+AI가 분류한 카테고리를 사용자가 직접 변경합니다.  
+변경 후 `classifiedBy`가 `USER`로 저장됩니다.
 
 **Path Parameter**
 
@@ -334,23 +434,47 @@ AI가 분류한 카테고리를 사용자가 직접 변경합니다.
 | categoryId | integer | ✅ | 변경할 카테고리 ID |
 
 ```json
-{
-  "categoryId": 1
-}
+{ "categoryId": 1 }
 ```
 
 **Response** `200 OK`
 
 ```json
-{
-  "success": true,
-  "data": null
-}
+{ "success": true, "data": null }
 ```
 
 ---
 
-### 2-4. 사진 상세 조회
+### 2-5. 대표 사진 지정
+
+```
+PATCH /api/photos/{photoId}/representative
+```
+
+날짜별 캘린더에 우선 표시할 대표 사진을 지정합니다.  
+같은 날짜의 기존 대표 사진이 있으면 자동으로 해제됩니다.
+
+**Path Parameter**
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| photoId | UUID | 대표로 지정할 사진 ID |
+
+**Response** `200 OK`
+
+```json
+{ "success": true, "data": null }
+```
+
+**에러**
+
+| HTTP | 조건 |
+|------|------|
+| 404 | 사진을 찾을 수 없거나 본인 소유가 아님 |
+
+---
+
+### 2-6. 사진 상세 조회
 
 ```
 GET /api/photos/{photoId}
@@ -370,7 +494,7 @@ GET /api/photos/{photoId}
   "data": {
     "photoId": "uuid-1",
     "url": "https://storage.../photo.jpg",
-    "thumbnailUrl": "https://storage.../thumb.jpg",
+    "thumbnailUrl": null,
     "takenAt": "2024-03-15",
     "exifAvailable": true,
     "uploadedAt": "2024-03-15T12:00:00",
@@ -389,6 +513,8 @@ GET /api/photos/{photoId}
 | `AI` | GPT가 자동 분류 |
 | `USER` | 사용자가 수동 변경 |
 
+> `thumbnailUrl`은 썸네일 생성 전까지 `null`. 캘린더 표시 시에는 `originalUrl`로 자동 fallback.
+
 **에러**
 
 | HTTP | 조건 |
@@ -397,7 +523,7 @@ GET /api/photos/{photoId}
 
 ---
 
-### 2-5. 사진 삭제
+### 2-7. 사진 삭제
 
 ```
 DELETE /api/photos/{photoId}
@@ -414,10 +540,7 @@ Storage와 DB에서 모두 삭제됩니다.
 **Response** `200 OK`
 
 ```json
-{
-  "success": true,
-  "data": null
-}
+{ "success": true, "data": null }
 ```
 
 **에러**
@@ -450,9 +573,7 @@ POST /api/calendar/save
 | uploadId | string | ✅ | 업로드 시 발급된 배치 식별자 |
 
 ```json
-{
-  "uploadId": "a1b2c3d4-..."
-}
+{ "uploadId": "a1b2c3d4-..." }
 ```
 
 **Response** `200 OK`
@@ -460,9 +581,7 @@ POST /api/calendar/save
 ```json
 {
   "success": true,
-  "data": {
-    "message": "캘린더에 저장되었습니다."
-  }
+  "data": { "message": "캘린더에 저장되었습니다." }
 }
 ```
 
@@ -503,9 +622,17 @@ GET /api/calendar?year={year}&month={month}
         "photos": [
           {
             "photoId": "uuid-1",
-            "thumbnailUrl": "https://storage.../thumb_photo1.jpg",
+            "thumbnailUrl": "https://storage.../photo1.jpg",
             "category": "음식",
-            "categoryColor": "#FAC775"
+            "categoryColor": "#FAC775",
+            "isRepresentative": true
+          },
+          {
+            "photoId": "uuid-2",
+            "thumbnailUrl": "https://storage.../photo2.jpg",
+            "category": "일상",
+            "categoryColor": "#D3D1C7",
+            "isRepresentative": false
           }
         ]
       }
@@ -513,6 +640,11 @@ GET /api/calendar?year={year}&month={month}
   }
 }
 ```
+
+| 필드 | 설명 |
+|------|------|
+| `thumbnailUrl` | 썸네일 미생성 시 원본 URL로 자동 fallback |
+| `isRepresentative` | 날짜별 대표 사진 여부. `PATCH /api/photos/{id}/representative`로 지정 |
 
 > `days`는 사진이 없는 날짜는 포함하지 않습니다. 해당 월 사진이 없으면 빈 배열 반환.
 
@@ -542,18 +674,8 @@ GET /api/categories
 {
   "success": true,
   "data": [
-    {
-      "categoryId": 1,
-      "name": "음식",
-      "colorHex": "#FAC775",
-      "isDefault": true
-    },
-    {
-      "categoryId": 7,
-      "name": "카페",
-      "colorHex": "#D4A5A5",
-      "isDefault": false
-    }
+    { "categoryId": 1, "name": "음식", "colorHex": "#FAC775", "isDefault": true },
+    { "categoryId": 7, "name": "카페", "colorHex": "#D4A5A5", "isDefault": false }
   ]
 }
 ```
@@ -574,10 +696,7 @@ POST /api/categories
 | colorHex | string | ❌ | 색상 코드 (예: `#D4A5A5`) |
 
 ```json
-{
-  "name": "카페",
-  "colorHex": "#D4A5A5"
-}
+{ "name": "카페", "colorHex": "#D4A5A5" }
 ```
 
 **Response** `201 Created`
@@ -585,12 +704,7 @@ POST /api/categories
 ```json
 {
   "success": true,
-  "data": {
-    "categoryId": 7,
-    "name": "카페",
-    "colorHex": "#D4A5A5",
-    "isDefault": false
-  }
+  "data": { "categoryId": 7, "name": "카페", "colorHex": "#D4A5A5", "isDefault": false }
 }
 ```
 
@@ -602,7 +716,7 @@ POST /api/categories
 PATCH /api/categories/{categoryId}
 ```
 
-> 시스템 기본 카테고리(`isDefault: true`)는 수정 불가
+> 시스템 기본 카테고리(`isDefault: true`)는 수정 불가 → `403 FORBIDDEN`
 
 **Path Parameter**
 
@@ -614,14 +728,11 @@ PATCH /api/categories/{categoryId}
 
 | 필드 | 타입 | 필수 | 설명 |
 |------|------|------|------|
-| name | string | ❌ | 변경할 이름 (최대 50자) |
+| name | string | ❌ | 변경할 이름 |
 | colorHex | string | ❌ | 변경할 색상 코드 |
 
 ```json
-{
-  "name": "카페투어",
-  "colorHex": "#C49A9A"
-}
+{ "name": "카페투어", "colorHex": "#C49A9A" }
 ```
 
 **Response** `200 OK`
@@ -629,12 +740,7 @@ PATCH /api/categories/{categoryId}
 ```json
 {
   "success": true,
-  "data": {
-    "categoryId": 7,
-    "name": "카페투어",
-    "colorHex": "#C49A9A",
-    "isDefault": false
-  }
+  "data": { "categoryId": 7, "name": "카페투어", "colorHex": "#C49A9A", "isDefault": false }
 }
 ```
 
@@ -657,10 +763,7 @@ DELETE /api/categories/{categoryId}
 **Response** `200 OK`
 
 ```json
-{
-  "success": true,
-  "data": null
-}
+{ "success": true, "data": null }
 ```
 
 ---
@@ -715,9 +818,14 @@ photos
   thumbnail_url
   taken_at (DATE)
   exif_available (BOOL)
-  phash (BIGINT)
-  upload_id (VARCHAR(36)) — 같은 업로드 배치 식별자
-  status (PENDING | CONFIRMED) — PENDING: 캘린더 저장 대기 / CONFIRMED: 캘린더 반영 완료
+  phash (BIGINT)           — 중복 사진 감지용 perceptual hash
+  sharpness (FLOAT)        — 버스트샷 대표 사진 선택용 선명도 점수
+  upload_id (VARCHAR(36))  — 같은 업로드 배치 식별자
+  status (PROCESSING | PENDING | CONFIRMED)
+    PROCESSING: AI 분류 진행 중
+    PENDING:    분류 완료, 캘린더 저장 대기
+    CONFIRMED:  캘린더에 최종 반영
+  is_representative (BOOL) — 날짜별 대표 사진 여부
   uploaded_at
 
 photo_categories
@@ -725,7 +833,7 @@ photo_categories
   photo_id (FK → photos)
   category_id (FK → categories)
   classified_by (AI | USER)
-  ai_confidence (FLOAT)
+  ai_confidence (FLOAT)    — GPT 분류 신뢰도 (0.0 ~ 1.0)
   user_corrected (BOOL)
   classified_at
 ```
@@ -738,10 +846,13 @@ photo_categories
 |-----|------|
 | POST /api/auth/signup | ✅ 완료 |
 | POST /api/auth/login | ✅ 완료 |
-| POST /api/auth/social | ⚠️ 껍데기만 (소셜 연동 미구현) |
-| POST /api/photos/upload | ✅ 완료 |
+| POST /api/auth/social | ⚠️ 미구현 (호출 시 501 반환) |
+| POST /api/auth/refresh | ✅ 완료 (Sliding Window 적용) |
+| POST /api/photos/upload | ✅ 완료 (비동기 202 반환) |
+| GET /api/photos/upload/{uploadId}/status | ✅ 완료 (폴링) |
 | POST /api/photos/duplicates/select | ✅ 완료 |
 | PATCH /api/photos/{id}/category | ✅ 완료 |
+| PATCH /api/photos/{id}/representative | ✅ 완료 |
 | GET /api/photos/{id} | ✅ 완료 |
 | DELETE /api/photos/{id} | ✅ 완료 |
 | POST /api/calendar/save | ✅ 완료 |
