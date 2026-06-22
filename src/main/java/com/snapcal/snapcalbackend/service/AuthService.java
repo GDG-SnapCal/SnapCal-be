@@ -68,12 +68,14 @@ public class AuthService {
         return buildAuthResult(user, isNewUser);
     }
 
-    public String refresh(String refreshToken) {
+    public AuthResult refresh(String refreshToken) {
         if (!jwtService.isValid(refreshToken)) {
             throw new InvalidCredentialsException();
         }
         String email = jwtService.extractEmail(refreshToken);
-        return jwtService.generateAccessToken(email);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(InvalidCredentialsException::new);
+        return buildAuthResult(user, false);
     }
 
     private AuthResult buildAuthResult(User user, boolean isNewUser) {

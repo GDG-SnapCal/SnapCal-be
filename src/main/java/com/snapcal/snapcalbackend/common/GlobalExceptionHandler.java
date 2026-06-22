@@ -48,6 +48,12 @@ public class GlobalExceptionHandler {
         return ApiResponse.error("BAD_REQUEST", e.getMessage());
     }
 
+    @ExceptionHandler(UnsupportedOperationException.class)
+    @ResponseStatus(HttpStatus.NOT_IMPLEMENTED)
+    public ApiResponse<Void> handleUnsupportedOperation(UnsupportedOperationException e) {
+        return ApiResponse.error("NOT_IMPLEMENTED", e.getMessage());
+    }
+
     @ExceptionHandler(ResponseStatusException.class)
     public org.springframework.http.ResponseEntity<ApiResponse<Void>> handleResponseStatus(ResponseStatusException e) {
         ApiResponse<Void> body = ApiResponse.error(

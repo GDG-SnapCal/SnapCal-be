@@ -52,11 +52,11 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    public ApiResponse<AuthResponse> refresh(HttpServletRequest request) {
+    public ApiResponse<AuthResponse> refresh(HttpServletRequest request, HttpServletResponse response) {
         String refreshToken = extractRefreshTokenFromCookie(request);
-        String newAccessToken = authService.refresh(refreshToken);
-        AuthResponse body = AuthResponse.builder().accessToken(newAccessToken).build();
-        return ApiResponse.ok(body);
+        AuthService.AuthResult result = authService.refresh(refreshToken);
+        setRefreshTokenCookie(response, result.refreshToken());
+        return ApiResponse.ok(result.response());
     }
 
     private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
