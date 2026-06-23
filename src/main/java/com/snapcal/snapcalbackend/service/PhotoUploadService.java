@@ -188,7 +188,11 @@ public class PhotoUploadService {
 
         List<UUID> photoIds = photos.stream().map(Photo::getId).toList();
         Map<UUID, PhotoCategory> categoryByPhotoId = photoCategoryRepository.findByPhotoIdIn(photoIds)
-                .stream().collect(Collectors.toMap(pc -> pc.getPhoto().getId(), pc -> pc));
+                .stream().collect(Collectors.toMap(
+                        pc -> pc.getPhoto().getId(),
+                        pc -> pc,
+                        (existing, ignored) -> existing
+                ));
 
         return photos.stream()
                 .filter(photo -> {
@@ -218,7 +222,11 @@ public class PhotoUploadService {
         Map<UUID, PhotoCategory> categoryByPhotoId = photoCategoryRepository
                 .findByPhotoIdIn(photoIds)
                 .stream()
-                .collect(Collectors.toMap(pc -> pc.getPhoto().getId(), pc -> pc));
+                .collect(Collectors.toMap(
+                        pc -> pc.getPhoto().getId(),
+                        pc -> pc,
+                        (existing, ignored) -> existing
+                ));
 
         List<PhotoUploadResponse.Classification> classifications = photos.stream()
                 .map(photo -> {
