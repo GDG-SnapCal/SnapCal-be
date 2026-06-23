@@ -703,6 +703,9 @@ GET /api/calendar?year={year}&month={month}
 
 > 모든 엔드포인트에 `Authorization: Bearer {accessToken}` 헤더가 필요합니다.
 
+> **AI 분류 제약사항**: AI는 시스템 기본 카테고리(음식/패션/운동/풍경/일상/미분류) 6개로만 자동 분류합니다.  
+> 커스텀 카테고리로 이동시키려면 `PATCH /api/photos/{id}/category`로 사용자가 직접 변경해야 합니다.
+
 ### 4-1. 카테고리 목록 조회
 
 ```
