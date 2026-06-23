@@ -247,7 +247,49 @@ POST /api/auth/refresh
 
 ---
 
-### 2-1. 사진 업로드
+### 2-1. 날짜별 사진 목록 조회
+
+```
+GET /api/photos?date={date}&category={category}
+```
+
+특정 날짜의 `CONFIRMED` 사진 목록을 반환합니다. 카테고리 필터는 선택사항입니다.
+
+**Query Parameters**
+
+| 파라미터 | 타입 | 필수 | 설명 |
+|----------|------|------|------|
+| date | string | ✅ | 조회할 날짜 (`yyyy-MM-dd`) |
+| category | string | ❌ | 카테고리 이름으로 필터링 (예: `음식`) |
+
+**Response** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "photoId": "uuid-1",
+      "thumbnailUrl": "https://storage.../photo1.jpg",
+      "originalUrl": "https://storage.../photo1.jpg",
+      "category": "음식",
+      "isRepresentative": true,
+      "takenAt": "2024-03-15"
+    }
+  ]
+}
+```
+
+| 필드 | 설명 |
+|------|------|
+| `thumbnailUrl` | 썸네일 미생성 시 원본 URL로 자동 fallback |
+| `isRepresentative` | 날짜별 대표 사진 여부 |
+
+> 해당 날짜 사진이 없으면 빈 배열 반환.
+
+---
+
+### 2-2. 사진 업로드
 
 ```
 POST /api/photos/upload
@@ -849,6 +891,7 @@ photo_categories
 | POST /api/auth/login | ✅ 완료 |
 | POST /api/auth/social | ⚠️ 미구현 (호출 시 501 반환) |
 | POST /api/auth/refresh | ✅ 완료 (Sliding Window 적용) |
+| GET /api/photos | ✅ 완료 (날짜별 조회, 카테고리 필터) |
 | POST /api/photos/upload | ✅ 완료 (비동기 202 반환) |
 | GET /api/photos/upload/{uploadId}/status | ✅ 완료 (폴링) |
 | POST /api/photos/duplicates/select | ✅ 완료 |
