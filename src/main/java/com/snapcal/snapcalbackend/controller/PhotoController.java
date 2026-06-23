@@ -5,6 +5,7 @@ import com.snapcal.snapcalbackend.domain.User;
 import com.snapcal.snapcalbackend.dto.request.CategoryUpdateRequest;
 import com.snapcal.snapcalbackend.dto.request.DuplicateSelectRequest;
 import com.snapcal.snapcalbackend.dto.response.PhotoDetailResponse;
+import com.snapcal.snapcalbackend.dto.response.PhotoListResponse;
 import com.snapcal.snapcalbackend.dto.response.UploadInitiatedResponse;
 import com.snapcal.snapcalbackend.dto.response.UploadStatusResponse;
 import com.snapcal.snapcalbackend.repository.PhotoCategoryRepository;
@@ -60,13 +61,13 @@ public class PhotoController {
     }
 
     @GetMapping
-    public ApiResponse<List<com.snapcal.snapcalbackend.dto.response.PhotoListResponse>> getPhotos(
+    public ApiResponse<List<PhotoListResponse>> getPhotos(
             @RequestParam LocalDate date,
             @RequestParam(required = false) String category,
             @AuthenticationPrincipal UserDetails userDetails) {
-        
+
         User user = resolveUser(userDetails);
-        List<com.snapcal.snapcalbackend.dto.response.PhotoListResponse> photos = photoUploadService.getPhotosByDate(date, category, user);
+        List<PhotoListResponse> photos = photoUploadService.getPhotosByDate(date, category, user);
         return ApiResponse.ok(photos);
     }
 
