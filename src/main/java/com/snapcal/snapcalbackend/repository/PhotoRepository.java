@@ -15,6 +15,10 @@ public interface PhotoRepository extends JpaRepository<Photo, UUID> {
     List<Photo> findByUserIdAndTakenAtBetweenAndStatus(
             UUID userId, LocalDate start, LocalDate end, PhotoStatus status);
 
+    /** 특정 날짜의 사진 조회 — CONFIRMED 상태만 */
+    List<Photo> findByUserIdAndTakenAtAndStatus(
+            UUID userId, LocalDate takenAt, PhotoStatus status);
+
     /** 업로드 배치 전체 조회 — 캘린더 저장 시 사용 */
     List<Photo> findByUploadIdAndStatus(String uploadId, PhotoStatus status);
 
