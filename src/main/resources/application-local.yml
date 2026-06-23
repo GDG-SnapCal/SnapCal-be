@@ -6,6 +6,7 @@ spring:
     hibernate:
       ddl-auto: none   # init.sql이 테이블 생성하므로 JPA 자동생성 비활성화
     show-sql: true
+    open-in-view: false
 
 # 로컬에서는 MinIO 사용 (docker-compose의 minio 서비스)
 supabase:
@@ -19,3 +20,4 @@ supabase:
 logging:
   level:
     com.snapcal: DEBUG
+    org.hibernate.SQL: DEBUG

@@ -1,5 +1,6 @@
 package com.snapcal.snapcalbackend.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -27,6 +28,7 @@ public class CalendarResponse {
         private String thumbnailUrl;
         private String category;
         private String categoryColor;
+        @JsonProperty("isRepresentative")
         private boolean isRepresentative;
     }
 }

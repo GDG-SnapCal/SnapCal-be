@@ -1,5 +1,6 @@
 package com.snapcal.snapcalbackend.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -10,6 +11,7 @@ public class PhotoListResponse {
     private String thumbnailUrl;
     private String originalUrl;
     private String category;
+    @JsonProperty("isRepresentative")
     private boolean isRepresentative;
     private String takenAt;
 }

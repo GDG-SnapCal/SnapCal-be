@@ -14,11 +14,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate        # 운영은 validate, 개발 초기엔 update 사용
-    show-sql: true
+    show-sql: false
+    open-in-view: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
 
   servlet:
     multipart:
@@ -54,5 +54,5 @@ cors:
 # 로깅
 logging:
   level:
-    com.snapcal: DEBUG
-    org.hibernate.SQL: DEBUG
+    com.snapcal: INFO
+    org.hibernate.SQL: WARN
