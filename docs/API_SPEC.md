@@ -1,6 +1,7 @@
 # SnapCal Backend API 명세서
 
-> **Base URL**: `http://localhost:8080`  
+> **Base URL (로컬)**: `http://localhost:8080`  
+> **Base URL (운영)**: `https://vibrant-wholeness-production-b4a2.up.railway.app`  
 > **Content-Type**: `application/json` (파일 업로드는 `multipart/form-data`)  
 > **인증**: `Authorization: Bearer {accessToken}` (명시된 엔드포인트에 한해 필요)
 
