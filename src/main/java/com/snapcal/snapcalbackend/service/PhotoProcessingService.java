@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Map;
 import java.util.UUID;
@@ -22,11 +24,8 @@ public class PhotoProcessingService {
     private final PhotoCategoryRepository photoCategoryRepository;
     private final CategoryRepository categoryRepository;
     private final ImageClassificationService classificationService;
+    private final PlatformTransactionManager transactionManager;
 
-    /**
-     * GPT 분류 + pHash + 선명도 계산을 백그라운드 스레드에서 병렬 처리.
-     * 각 사진이 완료될 때마다 PROCESSING → PENDING 전환.
-     */
     @Async("photoProcessingExecutor")
     public void processAsync(Map<UUID, byte[]> photoIdToBytes, Map<UUID, String> photoIdToContentType) {
         for (Map.Entry<UUID, byte[]> entry : photoIdToBytes.entrySet()) {
@@ -40,16 +39,10 @@ public class PhotoProcessingService {
 
     private void processOne(UUID photoId, byte[] bytes, String contentType) {
         try {
-            Photo photo = photoRepository.findById(photoId).orElse(null);
-            if (photo == null) return;
-
-            // GPT 분류
+            // 느린 작업(GPT, pHash)은 트랜잭션 밖에서 수행
             ImageClassificationService.ClassificationResult result =
                     classificationService.classify(bytes, contentType);
-            Category category = categoryRepository.findByNameAndIsDefaultTrue(result.category())
-                    .orElseGet(() -> categoryRepository.findByNameAndIsDefaultTrue("미분류").orElseThrow());
 
-            // pHash + 선명도 계산
             Long phash = null;
             Double sharpness = null;
             try {
@@ -59,16 +52,30 @@ public class PhotoProcessingService {
                 log.warn("이미지 분석 실패 (pHash/선명도): {}", photoId, e);
             }
 
-            photo.completeProcessing(phash, sharpness);
-            photoRepository.save(photo);
+            final Long finalPhash = phash;
+            final Double finalSharpness = sharpness;
 
-            photoCategoryRepository.save(PhotoCategory.builder()
-                    .photo(photo)
-                    .category(category)
-                    .classifiedBy(ClassifiedBy.AI)
-                    .aiConfidence(result.confidence())
-                    .userCorrected(false)
-                    .build());
+            // photo 저장 + photo_category 저장을 하나의 트랜잭션으로 묶음
+            new TransactionTemplate(transactionManager).execute(status -> {
+                Photo photo = photoRepository.findById(photoId).orElse(null);
+                if (photo == null) return null;
+
+                Category category = categoryRepository.findByNameAndIsDefaultTrue(result.category())
+                        .orElseGet(() -> categoryRepository.findByNameAndIsDefaultTrue("미분류").orElseThrow());
+
+                photo.completeProcessing(finalPhash, finalSharpness);
+                photoRepository.save(photo);
+
+                photoCategoryRepository.save(PhotoCategory.builder()
+                        .photo(photo)
+                        .category(category)
+                        .classifiedBy(ClassifiedBy.AI)
+                        .aiConfidence(result.confidence())
+                        .userCorrected(false)
+                        .build());
+
+                return null;
+            });
 
         } catch (Exception e) {
             log.error("사진 처리 중 오류 — 미분류로 fallback: photoId={}", photoId, e);
@@ -78,22 +85,26 @@ public class PhotoProcessingService {
 
     private void fallbackToUnclassified(UUID photoId) {
         try {
-            Photo photo = photoRepository.findById(photoId).orElse(null);
-            if (photo == null) return;
+            new TransactionTemplate(transactionManager).execute(status -> {
+                Photo photo = photoRepository.findById(photoId).orElse(null);
+                if (photo == null) return null;
 
-            Category unclassified = categoryRepository.findByNameAndIsDefaultTrue("미분류").orElse(null);
-            if (unclassified == null) return;
+                Category unclassified = categoryRepository.findByNameAndIsDefaultTrue("미분류").orElse(null);
+                if (unclassified == null) return null;
 
-            photo.completeProcessing(null, null);
-            photoRepository.save(photo);
+                photo.completeProcessing(null, null);
+                photoRepository.save(photo);
 
-            photoCategoryRepository.save(PhotoCategory.builder()
-                    .photo(photo)
-                    .category(unclassified)
-                    .classifiedBy(ClassifiedBy.AI)
-                    .aiConfidence(0.0)
-                    .userCorrected(false)
-                    .build());
+                photoCategoryRepository.save(PhotoCategory.builder()
+                        .photo(photo)
+                        .category(unclassified)
+                        .classifiedBy(ClassifiedBy.AI)
+                        .aiConfidence(0.0)
+                        .userCorrected(false)
+                        .build());
+
+                return null;
+            });
         } catch (Exception ex) {
             log.error("미분류 fallback 실패: photoId={}", photoId, ex);
         }
