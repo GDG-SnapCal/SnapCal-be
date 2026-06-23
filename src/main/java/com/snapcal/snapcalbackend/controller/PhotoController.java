@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -56,6 +57,17 @@ public class PhotoController {
         HttpStatus httpStatus = "processing".equals(status.getStatus())
                 ? HttpStatus.ACCEPTED : HttpStatus.OK;
         return ResponseEntity.status(httpStatus).body(ApiResponse.ok(status));
+    }
+
+    @GetMapping
+    public ApiResponse<List<com.snapcal.snapcalbackend.dto.response.PhotoListResponse>> getPhotos(
+            @RequestParam LocalDate date,
+            @RequestParam(required = false) String category,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        
+        User user = resolveUser(userDetails);
+        List<com.snapcal.snapcalbackend.dto.response.PhotoListResponse> photos = photoUploadService.getPhotosByDate(date, category, user);
+        return ApiResponse.ok(photos);
     }
 
     @PostMapping("/duplicates/select")

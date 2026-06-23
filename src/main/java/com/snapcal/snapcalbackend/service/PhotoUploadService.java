@@ -2,6 +2,7 @@ package com.snapcal.snapcalbackend.service;
 
 import com.snapcal.snapcalbackend.domain.*;
 import com.snapcal.snapcalbackend.dto.request.DuplicateSelectRequest;
+import com.snapcal.snapcalbackend.dto.response.PhotoListResponse;
 import com.snapcal.snapcalbackend.dto.response.PhotoUploadResponse;
 import com.snapcal.snapcalbackend.dto.response.UploadInitiatedResponse;
 import com.snapcal.snapcalbackend.dto.response.UploadStatusResponse;
@@ -177,6 +178,43 @@ public class PhotoUploadService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public List<PhotoListResponse> getPhotosByDate(LocalDate date, String categoryFilter, User user) {
+        List<Photo> photos = photoRepository.findByUserIdAndTakenAtAndStatus(user.getId(), date, PhotoStatus.CONFIRMED);
+
+        if (photos.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<UUID> photoIds = photos.stream().map(Photo::getId).toList();
+        Map<UUID, PhotoCategory> categoryByPhotoId = photoCategoryRepository.findByPhotoIdIn(photoIds)
+                .stream().collect(Collectors.toMap(
+                        pc -> pc.getPhoto().getId(),
+                        pc -> pc,
+                        (existing, ignored) -> existing
+                ));
+
+        return photos.stream()
+                .filter(photo -> {
+                    if (categoryFilter == null || categoryFilter.isBlank()) return true;
+                    PhotoCategory pc = categoryByPhotoId.get(photo.getId());
+                    return pc != null && pc.getCategory() != null && pc.getCategory().getName().equals(categoryFilter);
+                })
+                .map(photo -> {
+                    PhotoCategory pc = categoryByPhotoId.get(photo.getId());
+                    String categoryName = (pc != null && pc.getCategory() != null) ? pc.getCategory().getName() : "미분류";
+                    return PhotoListResponse.builder()
+                            .photoId(photo.getId().toString())
+                            .thumbnailUrl(photo.getThumbnailUrl() != null ? photo.getThumbnailUrl() : photo.getOriginalUrl())
+                            .originalUrl(photo.getOriginalUrl())
+                            .category(categoryName)
+                            .isRepresentative(photo.isRepresentative())
+                            .takenAt(photo.getTakenAt().toString())
+                            .build();
+                })
+                .toList();
+    }
+
     // ── private ──────────────────────────────────────────────────────
 
     private PhotoUploadResponse buildResponseFromDb(String uploadId, List<Photo> photos) {
@@ -184,7 +222,11 @@ public class PhotoUploadService {
         Map<UUID, PhotoCategory> categoryByPhotoId = photoCategoryRepository
                 .findByPhotoIdIn(photoIds)
                 .stream()
-                .collect(Collectors.toMap(pc -> pc.getPhoto().getId(), pc -> pc));
+                .collect(Collectors.toMap(
+                        pc -> pc.getPhoto().getId(),
+                        pc -> pc,
+                        (existing, ignored) -> existing
+                ));
 
         List<PhotoUploadResponse.Classification> classifications = photos.stream()
                 .map(photo -> {
