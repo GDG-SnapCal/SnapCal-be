@@ -3,10 +3,13 @@ spring:
     name: snapcal
 
   datasource:
-    url: jdbc:postgresql://${SUPABASE_HOST}:5432/postgres
+    url: jdbc:postgresql://${SUPABASE_HOST}:${SUPABASE_PORT:5432}/postgres?prepareThreshold=0
     username: ${SUPABASE_USER:postgres}
     password: ${SUPABASE_DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
 
   jpa:
     hibernate:
@@ -43,6 +46,10 @@ supabase:
     secret-key: ${SUPABASE_SECRET_KEY}
     bucket: snapcal-photos
     region: ap-northeast-2
+
+# CORS
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:5174}
 
 # 로깅
 logging:
