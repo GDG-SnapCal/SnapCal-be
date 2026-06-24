@@ -36,9 +36,9 @@ dependencies {
     // PostgreSQL (Supabase)
     runtimeOnly 'org.postgresql:postgresql'
 
-    // Lombok
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
+    // Lombok (1.18.36+ supports Java 23+)
+    compileOnly 'org.projectlombok:lombok:1.18.36'
+    annotationProcessor 'org.projectlombok:lombok:1.18.36'
 
     // OpenAI API 호출용 (GPT-4o mini)
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'

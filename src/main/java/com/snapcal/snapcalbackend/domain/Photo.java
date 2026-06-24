@@ -85,4 +85,8 @@ public class Photo {
     public void unsetRepresentative() {
         this.isRepresentative = false;
     }
+
+    public void updateImageUrl(String newUrl) {
+        this.originalUrl = newUrl;
+    }
 }

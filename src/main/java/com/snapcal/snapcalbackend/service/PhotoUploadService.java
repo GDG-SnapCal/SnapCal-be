@@ -2,6 +2,7 @@ package com.snapcal.snapcalbackend.service;
 
 import com.snapcal.snapcalbackend.domain.*;
 import com.snapcal.snapcalbackend.dto.request.DuplicateSelectRequest;
+import com.snapcal.snapcalbackend.dto.response.PhotoImageUpdateResponse;
 import com.snapcal.snapcalbackend.dto.response.PhotoListResponse;
 import com.snapcal.snapcalbackend.dto.response.PhotoUploadResponse;
 import com.snapcal.snapcalbackend.dto.response.UploadInitiatedResponse;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -118,6 +120,34 @@ public class PhotoUploadService {
                 .completed(total)
                 .duplicateGroups(result.getDuplicateGroups())
                 .classifications(result.getClassifications())
+                .build();
+    }
+
+    @Transactional
+    public PhotoImageUpdateResponse updateImage(UUID photoId, MultipartFile file, User user) {
+        Photo photo = photoRepository.findById(photoId)
+                .filter(p -> p.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "사진을 찾을 수 없습니다."));
+
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일을 읽을 수 없습니다.");
+        }
+
+        storageService.delete(photo.getOriginalUrl());
+
+        String newUrl = storageService.upload(bytes, user.getId().toString(),
+                file.getOriginalFilename(), file.getContentType());
+
+        photo.updateImageUrl(newUrl);
+
+        return PhotoImageUpdateResponse.builder()
+                .photoId(photo.getId().toString())
+                .originalUrl(newUrl)
+                .thumbnailUrl(photo.getThumbnailUrl())
                 .build();
     }
 

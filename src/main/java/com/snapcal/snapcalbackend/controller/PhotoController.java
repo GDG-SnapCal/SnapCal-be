@@ -5,6 +5,7 @@ import com.snapcal.snapcalbackend.domain.User;
 import com.snapcal.snapcalbackend.dto.request.CategoryUpdateRequest;
 import com.snapcal.snapcalbackend.dto.request.DuplicateSelectRequest;
 import com.snapcal.snapcalbackend.dto.response.PhotoDetailResponse;
+import com.snapcal.snapcalbackend.dto.response.PhotoImageUpdateResponse;
 import com.snapcal.snapcalbackend.dto.response.PhotoListResponse;
 import com.snapcal.snapcalbackend.dto.response.UploadInitiatedResponse;
 import com.snapcal.snapcalbackend.dto.response.UploadStatusResponse;
@@ -100,6 +101,16 @@ public class PhotoController {
         User user = resolveUser(userDetails);
         photoUploadService.setRepresentative(photoId, user);
         return ApiResponse.ok(null);
+    }
+
+    @PatchMapping("/{photoId}/image")
+    public ApiResponse<PhotoImageUpdateResponse> updateImage(
+            @PathVariable UUID photoId,
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        User user = resolveUser(userDetails);
+        return ApiResponse.ok(photoUploadService.updateImage(photoId, file, user));
     }
 
     @DeleteMapping("/{photoId}")
