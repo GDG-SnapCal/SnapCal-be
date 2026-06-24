@@ -8,6 +8,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface CategoryRepository extends JpaRepository<Category, Integer> {
-    Optional<Category> findByNameAndIsDefaultTrue(String name);
+    Optional<Category> findFirstByNameAndIsDefaultTrue(String name);
     List<Category> findByUserIdOrIsDefaultTrue(UUID userId);
 }

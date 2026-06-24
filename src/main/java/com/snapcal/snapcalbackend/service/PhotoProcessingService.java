@@ -60,8 +60,8 @@ public class PhotoProcessingService {
                 Photo photo = photoRepository.findById(photoId).orElse(null);
                 if (photo == null) return null;
 
-                Category category = categoryRepository.findByNameAndIsDefaultTrue(result.category())
-                        .orElseGet(() -> categoryRepository.findByNameAndIsDefaultTrue("미분류").orElseThrow());
+                Category category = categoryRepository.findFirstByNameAndIsDefaultTrue(result.category())
+                        .orElseGet(() -> categoryRepository.findFirstByNameAndIsDefaultTrue("미분류").orElseThrow());
 
                 photo.completeProcessing(finalPhash, finalSharpness);
                 photoRepository.save(photo);
@@ -89,7 +89,7 @@ public class PhotoProcessingService {
                 Photo photo = photoRepository.findById(photoId).orElse(null);
                 if (photo == null) return null;
 
-                Category unclassified = categoryRepository.findByNameAndIsDefaultTrue("미분류").orElse(null);
+                Category unclassified = categoryRepository.findFirstByNameAndIsDefaultTrue("미분류").orElse(null);
                 if (unclassified == null) return null;
 
                 photo.completeProcessing(null, null);
