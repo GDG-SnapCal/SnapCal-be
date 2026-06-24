@@ -23,6 +23,9 @@ EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", \
   "-Dspring.profiles.active=${SPRING_PROFILE:-local}", \
-  "-XX:+UseContainerSupport", \
-  "-XX:MaxRAMPercentage=75.0", \
+  "-Xmx256m", \
+  "-Xms128m", \
+  "-XX:+UseSerialGC", \
+  "-XX:MetaspaceSize=64m", \
+  "-XX:MaxMetaspaceSize=128m", \
   "app.jar"]
