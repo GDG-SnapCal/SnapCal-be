@@ -4,10 +4,10 @@ WORKDIR /app
 
 # 의존성 캐시 레이어 분리 (소스 변경 시 재다운로드 방지)
 COPY build.gradle settings.gradle* ./
-RUN gradle dependencies --no-daemon || true
+RUN GRADLE_OPTS="-Xmx384m -Xms128m -XX:+UseSerialGC" gradle dependencies --no-daemon || true
 
 COPY src ./src
-RUN GRADLE_OPTS="-Xmx512m -Xms256m" gradle bootJar --no-daemon -x test --max-workers=1
+RUN GRADLE_OPTS="-Xmx384m -Xms128m -XX:+UseSerialGC" gradle bootJar --no-daemon -x test --max-workers=1
 
 # ---- Run Stage ----
 FROM eclipse-temurin:17-jre-jammy
