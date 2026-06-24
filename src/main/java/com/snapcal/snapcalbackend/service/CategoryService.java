@@ -46,7 +46,7 @@ public class CategoryService {
     public void delete(User user, Integer categoryId) {
         Category category = findOwnedCustomCategory(user, categoryId);
 
-        Category unclassified = categoryRepository.findByNameAndIsDefaultTrue("미분류")
+        Category unclassified = categoryRepository.findFirstByNameAndIsDefaultTrue("미분류")
                 .orElseThrow(() -> new IllegalStateException("미분류 카테고리를 찾을 수 없습니다."));
 
         List<PhotoCategory> photoCategories = photoCategoryRepository.findAllByCategoryId(categoryId);
