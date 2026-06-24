@@ -323,7 +323,7 @@ Content-Type: multipart/form-data
 
 ---
 
-### 2-2. 업로드 상태 폴링
+### 2-3. 업로드 상태 폴링
 
 ```
 GET /api/photos/upload/{uploadId}/status
@@ -412,7 +412,7 @@ GET /api/photos/upload/{uploadId}/status
 
 ---
 
-### 2-3. 중복 사진 선택
+### 2-4. 중복 사진 선택
 
 ```
 POST /api/photos/duplicates/select
@@ -455,7 +455,7 @@ POST /api/photos/duplicates/select
 
 ---
 
-### 2-4. 카테고리 수동 변경
+### 2-5. 카테고리 수동 변경
 
 ```
 PATCH /api/photos/{photoId}/category
@@ -488,7 +488,7 @@ AI가 분류한 카테고리를 사용자가 직접 변경합니다.
 
 ---
 
-### 2-5. 대표 사진 지정
+### 2-6. 대표 사진 지정
 
 ```
 PATCH /api/photos/{photoId}/representative
@@ -517,7 +517,7 @@ PATCH /api/photos/{photoId}/representative
 
 ---
 
-### 2-6. 사진 상세 조회
+### 2-7. 사진 상세 조회
 
 ```
 GET /api/photos/{photoId}
@@ -566,7 +566,7 @@ GET /api/photos/{photoId}
 
 ---
 
-### 2-7. 사진 이미지 교체
+### 2-8. 사진 이미지 교체
 
 ```
 PATCH /api/photos/{photoId}/image
@@ -615,7 +615,7 @@ Storage에서 기존 파일을 삭제하고 새 파일을 업로드한 뒤 `orig
 
 ---
 
-### 2-8. 사진 삭제
+### 2-9. 사진 삭제
 
 ```
 DELETE /api/photos/{photoId}
