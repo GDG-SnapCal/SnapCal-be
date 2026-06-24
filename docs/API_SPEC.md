@@ -494,14 +494,26 @@ AI가 분류한 카테고리를 사용자가 직접 변경합니다.
 PATCH /api/photos/{photoId}/representative
 ```
 
-날짜별 캘린더에 우선 표시할 대표 사진을 지정합니다.  
-같은 날짜의 기존 대표 사진이 있으면 자동으로 해제됩니다.
+대표 사진을 지정합니다. `category` body 없으면 날짜 전체 대표, 있으면 카테고리 대표로 설정합니다.  
+같은 날짜·카테고리의 기존 대표 사진이 있으면 자동으로 해제됩니다.
 
 **Path Parameter**
 
 | 파라미터 | 타입 | 설명 |
 |----------|------|------|
 | photoId | UUID | 대표로 지정할 사진 ID |
+
+**Request Body** (선택)
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| category | string | ❌ | 카테고리 이름. 없으면 날짜 전체 대표로 지정 |
+
+```json
+{ "category": "음식" }
+```
+
+> Body 없이 호출하면 날짜 전체 대표 사진으로 지정됩니다.
 
 **Response** `200 OK`
 
@@ -514,6 +526,7 @@ PATCH /api/photos/{photoId}/representative
 | HTTP | 조건 |
 |------|------|
 | 404 | 사진을 찾을 수 없거나 본인 소유가 아님 |
+| 400 | 사진의 카테고리와 요청한 category가 다름 |
 
 ---
 
@@ -726,7 +739,15 @@ GET /api/calendar?year={year}&month={month}
             "categoryColor": "#D3D1C7",
             "isRepresentative": false
           }
-        ]
+        ],
+        "representativePhoto": {
+          "photoId": "uuid-1",
+          "thumbnailUrl": "https://storage.../photo1.jpg"
+        },
+        "categoryRepresentatives": {
+          "음식": { "photoId": "uuid-1", "thumbnailUrl": "https://storage.../photo1.jpg" },
+          "일상": { "photoId": "uuid-2", "thumbnailUrl": "https://storage.../photo2.jpg" }
+        }
       }
     ]
   }
@@ -736,7 +757,9 @@ GET /api/calendar?year={year}&month={month}
 | 필드 | 설명 |
 |------|------|
 | `thumbnailUrl` | 썸네일 미생성 시 원본 URL로 자동 fallback |
-| `isRepresentative` | 날짜별 대표 사진 여부. `PATCH /api/photos/{id}/representative`로 지정 |
+| `isRepresentative` | 날짜 전체 대표 사진 여부 |
+| `representativePhoto` | 날짜 전체 대표 사진 요약. 없으면 `null` |
+| `categoryRepresentatives` | 카테고리별 대표 사진 맵. 없으면 `null` |
 
 > `days`는 사진이 없는 날짜는 포함하지 않습니다. 해당 월 사진이 없으면 빈 배열 반환.
 
@@ -863,31 +886,7 @@ DELETE /api/categories/{categoryId}
 
 ---
 
-## 5. 미구현 API (예정)
-
-### 5-1. 내 프로필 조회
-
-```
-GET /api/users/me
-Authorization: Bearer {accessToken}
-```
-
-### 5-2. 프로필 수정
-
-```
-PATCH /api/users/me
-Authorization: Bearer {accessToken}
-Content-Type: multipart/form-data
-```
-
-| 필드 | 타입 | 필수 | 설명 |
-|------|------|------|------|
-| name | string | ❌ | 변경할 이름 |
-| profileImage | file | ❌ | 변경할 프로필 이미지 |
-
----
-
-## 6. ERD 요약
+## 5. ERD 요약
 
 ```
 users
@@ -928,14 +927,15 @@ photo_categories
   photo_id (FK → photos)
   category_id (FK → categories)
   classified_by (AI | USER)
-  ai_confidence (FLOAT)    — GPT 분류 신뢰도 (0.0 ~ 1.0)
+  ai_confidence (FLOAT)             — GPT 분류 신뢰도 (0.0 ~ 1.0)
   user_corrected (BOOL)
+  is_category_representative (BOOL) — 카테고리별 대표 사진 여부
   classified_at
 ```
 
 ---
 
-## 7. 구현 현황 요약
+## 6. 구현 현황 요약
 
 | API | 상태 |
 |-----|------|
@@ -948,15 +948,13 @@ photo_categories
 | GET /api/photos/upload/{uploadId}/status | ✅ 완료 (폴링) |
 | POST /api/photos/duplicates/select | ✅ 완료 |
 | PATCH /api/photos/{id}/category | ✅ 완료 |
-| PATCH /api/photos/{id}/representative | ✅ 완료 |
+| PATCH /api/photos/{id}/representative | ✅ 완료 (전체 대표 + 카테고리 대표) |
 | PATCH /api/photos/{id}/image | ✅ 완료 (이미지 교체) |
 | GET /api/photos/{id} | ✅ 완료 |
 | DELETE /api/photos/{id} | ✅ 완료 |
 | POST /api/calendar/save | ✅ 완료 |
-| GET /api/calendar | ✅ 완료 |
+| GET /api/calendar | ✅ 완료 (representativePhoto, categoryRepresentatives 포함) |
 | GET /api/categories | ✅ 완료 |
 | POST /api/categories | ✅ 완료 |
 | PATCH /api/categories/{id} | ✅ 완료 |
 | DELETE /api/categories/{id} | ✅ 완료 |
-| GET /api/users/me | ❌ 미구현 |
-| PATCH /api/users/me | ❌ 미구현 |
