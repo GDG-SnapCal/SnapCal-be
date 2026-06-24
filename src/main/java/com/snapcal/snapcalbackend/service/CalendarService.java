@@ -64,8 +64,13 @@ public class CalendarService {
         }
 
         List<UUID> photoIds = photos.stream().map(Photo::getId).toList();
-        Map<UUID, PhotoCategory> categoryByPhotoId = photoCategoryRepository
-                .findByPhotoIdIn(photoIds)
+        List<PhotoCategory> allPhotoCategories = photoCategoryRepository.findByPhotoIdIn(photoIds);
+
+        Map<UUID, PhotoCategory> categoryByPhotoId = allPhotoCategories.stream()
+                .collect(Collectors.toMap(pc -> pc.getPhoto().getId(), pc -> pc));
+
+        Map<UUID, PhotoCategory> categoryRepByPhotoId = photoCategoryRepository
+                .findByPhotoIdInAndIsCategoryRepresentativeTrue(photoIds)
                 .stream()
                 .collect(Collectors.toMap(pc -> pc.getPhoto().getId(), pc -> pc));
 
@@ -74,12 +79,43 @@ public class CalendarService {
 
         List<CalendarResponse.DayEntry> days = byDate.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
-                .map(entry -> CalendarResponse.DayEntry.builder()
-                        .date(entry.getKey().toString())
-                        .photos(entry.getValue().stream()
-                                .map(photo -> toPhotoEntry(photo, categoryByPhotoId.get(photo.getId())))
-                                .toList())
-                        .build())
+                .map(entry -> {
+                    List<Photo> dayPhotos = entry.getValue();
+                    List<UUID> dayPhotoIds = dayPhotos.stream().map(Photo::getId).toList();
+
+                    CalendarResponse.RepresentativePhotoInfo repPhoto = dayPhotos.stream()
+                            .filter(Photo::isRepresentative)
+                            .findFirst()
+                            .map(p -> CalendarResponse.RepresentativePhotoInfo.builder()
+                                    .photoId(p.getId().toString())
+                                    .thumbnailUrl(p.getThumbnailUrl() != null ? p.getThumbnailUrl() : p.getOriginalUrl())
+                                    .build())
+                            .orElse(null);
+
+                    Map<String, CalendarResponse.RepresentativePhotoInfo> categoryReps = dayPhotoIds.stream()
+                            .filter(categoryRepByPhotoId::containsKey)
+                            .map(categoryRepByPhotoId::get)
+                            .collect(Collectors.toMap(
+                                    pc -> pc.getCategory().getName(),
+                                    pc -> {
+                                        Photo p = pc.getPhoto();
+                                        return CalendarResponse.RepresentativePhotoInfo.builder()
+                                                .photoId(p.getId().toString())
+                                                .thumbnailUrl(p.getThumbnailUrl() != null ? p.getThumbnailUrl() : p.getOriginalUrl())
+                                                .build();
+                                    },
+                                    (a, b) -> a
+                            ));
+
+                    return CalendarResponse.DayEntry.builder()
+                            .date(entry.getKey().toString())
+                            .photos(dayPhotos.stream()
+                                    .map(photo -> toPhotoEntry(photo, categoryByPhotoId.get(photo.getId())))
+                                    .toList())
+                            .representativePhoto(repPhoto)
+                            .categoryRepresentatives(categoryReps.isEmpty() ? null : categoryReps)
+                            .build();
+                })
                 .toList();
 
         return CalendarResponse.builder()

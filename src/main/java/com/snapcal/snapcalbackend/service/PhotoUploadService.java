@@ -178,18 +178,37 @@ public class PhotoUploadService {
     }
 
     @Transactional
-    public void setRepresentative(UUID photoId, User user) {
+    public void setRepresentative(UUID photoId, String categoryName, User user) {
         Photo photo = photoRepository.findById(photoId)
                 .filter(p -> p.getUser().getId().equals(user.getId()))
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "사진을 찾을 수 없습니다."));
 
-        if (photo.getTakenAt() != null) {
-            photoRepository.findByUserIdAndTakenAtAndIsRepresentativeTrue(user.getId(), photo.getTakenAt())
-                    .ifPresent(Photo::unsetRepresentative);
-        }
+        if (categoryName != null && !categoryName.isBlank()) {
+            PhotoCategory photoCategory = photoCategoryRepository.findByPhotoId(photo.getId())
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND, "카테고리 정보를 찾을 수 없습니다."));
 
-        photo.setAsRepresentative();
+            if (!photoCategory.getCategory().getName().equals(categoryName)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "사진의 카테고리가 요청한 카테고리와 다릅니다.");
+            }
+
+            if (photo.getTakenAt() != null) {
+                photoCategoryRepository.findCategoryRepresentatives(
+                        user.getId(), photo.getTakenAt(), photoCategory.getCategory().getId())
+                        .forEach(PhotoCategory::unsetCategoryRepresentative);
+            }
+
+            photoCategory.setAsCategoryRepresentative();
+        } else {
+            if (photo.getTakenAt() != null) {
+                photoRepository.findByUserIdAndTakenAtAndIsRepresentativeTrue(user.getId(), photo.getTakenAt())
+                        .ifPresent(Photo::unsetRepresentative);
+            }
+
+            photo.setAsRepresentative();
+        }
     }
 
     @Transactional

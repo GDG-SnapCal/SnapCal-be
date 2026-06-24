@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Builder
@@ -20,6 +21,15 @@ public class CalendarResponse {
     public static class DayEntry {
         private String date;
         private List<PhotoEntry> photos;
+        private RepresentativePhotoInfo representativePhoto;
+        private Map<String, RepresentativePhotoInfo> categoryRepresentatives;
+    }
+
+    @Getter
+    @Builder
+    public static class RepresentativePhotoInfo {
+        private String photoId;
+        private String thumbnailUrl;
     }
 
     @JsonIgnoreProperties({"representative"})

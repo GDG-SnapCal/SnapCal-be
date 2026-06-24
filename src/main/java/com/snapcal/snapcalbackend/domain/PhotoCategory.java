@@ -36,6 +36,10 @@ public class PhotoCategory {
     @Column(name = "user_corrected", nullable = false)
     private boolean userCorrected;
 
+    @Column(name = "is_category_representative", nullable = false)
+    @Builder.Default
+    private boolean isCategoryRepresentative = false;
+
     @Column(name = "classified_at", nullable = false, updatable = false)
     private LocalDateTime classifiedAt;
 
@@ -48,6 +52,14 @@ public class PhotoCategory {
         this.category = newCategory;
         this.classifiedBy = ClassifiedBy.USER;
         this.userCorrected = true;
+    }
+
+    public void setAsCategoryRepresentative() {
+        this.isCategoryRepresentative = true;
+    }
+
+    public void unsetCategoryRepresentative() {
+        this.isCategoryRepresentative = false;
     }
 
     /** 카테고리 삭제 시 미분류로 이동 — 분류 주체/정정 여부는 그대로 유지 */

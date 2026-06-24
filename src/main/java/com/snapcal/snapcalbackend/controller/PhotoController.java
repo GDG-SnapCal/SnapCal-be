@@ -4,6 +4,7 @@ import com.snapcal.snapcalbackend.common.ApiResponse;
 import com.snapcal.snapcalbackend.domain.User;
 import com.snapcal.snapcalbackend.dto.request.CategoryUpdateRequest;
 import com.snapcal.snapcalbackend.dto.request.DuplicateSelectRequest;
+import com.snapcal.snapcalbackend.dto.request.SetRepresentativeRequest;
 import com.snapcal.snapcalbackend.dto.response.PhotoDetailResponse;
 import com.snapcal.snapcalbackend.dto.response.PhotoImageUpdateResponse;
 import com.snapcal.snapcalbackend.dto.response.PhotoListResponse;
@@ -97,10 +98,12 @@ public class PhotoController {
     @PatchMapping("/{photoId}/representative")
     public ApiResponse<Void> setRepresentative(
             @PathVariable UUID photoId,
+            @RequestBody(required = false) SetRepresentativeRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
 
         User user = resolveUser(userDetails);
-        photoUploadService.setRepresentative(photoId, user);
+        String categoryName = (request != null) ? request.getCategory() : null;
+        photoUploadService.setRepresentative(photoId, categoryName, user);
         return ApiResponse.ok(null);
     }
 
