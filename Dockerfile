@@ -7,7 +7,7 @@ COPY build.gradle settings.gradle* ./
 RUN gradle dependencies --no-daemon || true
 
 COPY src ./src
-RUN gradle bootJar --no-daemon -x test
+RUN GRADLE_OPTS="-Xmx512m -Xms256m" gradle bootJar --no-daemon -x test --max-workers=1
 
 # ---- Run Stage ----
 FROM eclipse-temurin:17-jre-jammy
