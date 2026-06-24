@@ -45,10 +45,11 @@ public class PhotoController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public ApiResponse<UploadInitiatedResponse> upload(
             @RequestParam("photos") List<MultipartFile> photos,
+            @RequestParam(value = "takenAt", required = false) LocalDate takenAt,
             @AuthenticationPrincipal UserDetails userDetails) {
 
         User user = resolveUser(userDetails);
-        return ApiResponse.ok(photoUploadService.upload(photos, user));
+        return ApiResponse.ok(photoUploadService.upload(photos, takenAt, user));
     }
 
     @GetMapping("/upload/{uploadId}/status")

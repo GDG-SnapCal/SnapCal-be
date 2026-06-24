@@ -303,6 +303,9 @@ Content-Type: multipart/form-data
 | 필드 | 타입 | 필수 | 설명 |
 |------|------|------|------|
 | photos | file[] | ✅ | 사진 파일 목록 (장당 최대 20MB) |
+| takenAt | string | ❌ | 촬영 날짜 (`yyyy-MM-dd`). EXIF가 없는 사진에 fallback으로 적용 |
+
+> EXIF 날짜가 있는 사진은 EXIF를 우선 사용합니다. `takenAt` 없이 EXIF도 없으면 캘린더에 표시되지 않습니다.
 
 **Response** `202 Accepted`
 

@@ -41,7 +41,7 @@ public class PhotoUploadService {
      * 스토리지 업로드 + PROCESSING 상태 저장까지만 동기 처리 후 즉시 202 반환.
      * AI 분류·pHash는 {@link PhotoProcessingService}가 백그라운드에서 처리.
      */
-    public UploadInitiatedResponse upload(List<MultipartFile> files, User user) {
+    public UploadInitiatedResponse upload(List<MultipartFile> files, LocalDate fallbackDate, User user) {
         String uploadId = UUID.randomUUID().toString();
         Map<UUID, byte[]> photoIdToBytes = new LinkedHashMap<>();
         Map<UUID, String> photoIdToContentType = new LinkedHashMap<>();
@@ -53,14 +53,15 @@ public class PhotoUploadService {
                 String url = storageService.upload(bytes, user.getId().toString(),
                         file.getOriginalFilename(), file.getContentType());
 
-                Optional<LocalDate> takenAt = exifExtractor.extract(bytes);
+                Optional<LocalDate> exifDate = exifExtractor.extract(bytes);
+                LocalDate takenAt = exifDate.orElse(fallbackDate);
 
                 // 각 save()는 Spring Data JPA의 @Transactional이 개별 커밋 보장
                 Photo photo = photoRepository.save(Photo.builder()
                         .user(user)
                         .originalUrl(url)
-                        .takenAt(takenAt.orElse(null))
-                        .exifAvailable(takenAt.isPresent())
+                        .takenAt(takenAt)
+                        .exifAvailable(exifDate.isPresent())
                         .uploadId(uploadId)
                         .status(PhotoStatus.PROCESSING)
                         .build());
