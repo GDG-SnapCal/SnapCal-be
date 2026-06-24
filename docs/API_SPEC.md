@@ -566,7 +566,56 @@ GET /api/photos/{photoId}
 
 ---
 
-### 2-7. 사진 삭제
+### 2-7. 사진 이미지 교체
+
+```
+PATCH /api/photos/{photoId}/image
+Content-Type: multipart/form-data
+```
+
+편집된 이미지로 기존 사진 파일을 교체합니다.  
+Storage에서 기존 파일을 삭제하고 새 파일을 업로드한 뒤 `original_url`을 갱신합니다.
+
+**Path Parameter**
+
+| 파라미터 | 타입 | 설명 |
+|----------|------|------|
+| photoId | UUID | 사진 ID |
+
+**Form Data**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| file | file | ✅ | 교체할 이미지 파일 (image/jpeg 권장) |
+
+**Response** `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "photoId": "uuid-1",
+    "originalUrl": "https://storage.../new-photo.jpg",
+    "thumbnailUrl": null
+  }
+}
+```
+
+| 필드 | 설명 |
+|------|------|
+| `originalUrl` | 교체된 새 이미지 URL |
+| `thumbnailUrl` | 썸네일 생성 전까지 `null` |
+
+**에러**
+
+| HTTP | 조건 |
+|------|------|
+| 404 | 사진을 찾을 수 없거나 본인 소유가 아님 |
+| 400 | 파일을 읽을 수 없음 |
+
+---
+
+### 2-8. 사진 삭제
 
 ```
 DELETE /api/photos/{photoId}
@@ -900,6 +949,7 @@ photo_categories
 | POST /api/photos/duplicates/select | ✅ 완료 |
 | PATCH /api/photos/{id}/category | ✅ 완료 |
 | PATCH /api/photos/{id}/representative | ✅ 완료 |
+| PATCH /api/photos/{id}/image | ✅ 완료 (이미지 교체) |
 | GET /api/photos/{id} | ✅ 완료 |
 | DELETE /api/photos/{id} | ✅ 완료 |
 | POST /api/calendar/save | ✅ 완료 |
